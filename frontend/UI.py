@@ -1,19 +1,35 @@
 import streamlit as st
 import requests
 
-st.title("Company Chatbot")
+st.set_page_config(
+    page_title="Scaller AI Assistant",
+    page_icon="🤖"
+)
 
-q = st.text_input("Ask a Question")
+st.title("🤖 Scaller Technologies AI Assistant")
+
+st.write("Ask anything about Scaller Technologies.")
+
+q = st.text_input("Enter your question")
 
 if st.button("Ask"):
 
-    r = requests.post(
-        "http://127.0.0.1:8000/chat",
-        json={"question": q}
-    )
+    if q == "":
+        st.warning("Please enter a question.")
 
-    a = r.json()
+    else:
 
-    st.write("Answer")
+        with st.spinner("Generating answer..."):
 
-    st.write(a["answer"])
+            r = requests.post(
+                "http://127.0.0.1:8000/chat",
+                json={"question": q}
+            )
+
+            a = r.json()
+
+        st.success("Answer Generated")
+
+        st.subheader("Answer")
+
+        st.write(a["answer"])
