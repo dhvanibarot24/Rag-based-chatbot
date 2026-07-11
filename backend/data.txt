@@ -1,0 +1,31 @@
+ABC Technologies
+
+Location:
+Ahmedabad, Gujarat
+
+Phone:
+9876543210
+
+Email:
+abc@gmail.com
+
+Services:
+Web Development
+AI Development
+Mobile App Development
+
+Completed Projects:
+Hospital Management System
+School Management System
+Inventory Management System
+
+FAQ
+
+Q: Where is the company located?
+A: Ahmedabad, Gujarat.
+
+Q: What services do you provide?
+A: Web Development, AI Development and Mobile App Development.
+
+Q: How can I contact the company?
+A: Call 9876543210 or email abc@gmail.com.
