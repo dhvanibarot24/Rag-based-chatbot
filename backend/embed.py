@@ -12,11 +12,12 @@ except:
 
 col = db.get_or_create_collection("company")
 
+
 file = open("data.txt", "r", encoding="utf-8")
 text = file.read()
 file.close()
 
-data = text.split("\n\n")
+data = text.split("--------------------------------")
 
 for i in range(len(data)):
     e = model.encode(data[i]).tolist()

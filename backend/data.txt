@@ -9,16 +9,19 @@ Founder: Ananya Patel
 CEO: Rohan Mehta
 
 Headquarters: Ahmedabad, Gujarat, India
+--------------------------------
 
 Company Description: Scaller Technologies is a growing software development company that helps startups, SMEs, and enterprises build digital products with modern technology, practical strategy, and dependable support.
+--------------------------------
 
 2. Vision
 
 Scaller Technologies aims to become a leading digital innovation partner in India by helping businesses transform ideas into scalable and user-friendly software solutions.
+--------------------------------
 
 3. Mission
-
 Scaller Technologies is committed to delivering reliable software products, smart automation, and efficient digital experiences that improve business growth and customer satisfaction.
+--------------------------------
 
 4. Contact Information
 
@@ -29,26 +32,20 @@ Phone: +91 79 4466 2211
 Email: contact@scallertechnologies.com
 
 Website: www.scallertechnologies.com
+--------------------------------
 
 Business Hours: Monday to Friday, 9:30 AM to 7:00 PM; Saturday, 10:00 AM to 2:00 PM
+--------------------------------
 
 5. Services
-
-Web Development: Scaller Technologies builds responsive websites for businesses, portfolios, and online brands with clean layouts and strong performance. Technologies Used: HTML, CSS, JavaScript, React, Next.js, Node.js
-
-Mobile App Development: The company develops Android and iOS applications for service-based businesses, e-commerce, and internal operations. Technologies Used: Flutter, React Native, Kotlin, Swift, Firebase
-
-AI Development: Scaller Technologies creates custom AI models and intelligent systems for automation, prediction, optimization, and data-driven decision making. Technologies Used: Python, TensorFlow, PyTorch, OpenAI APIs, scikit-learn
-
-RAG Chatbot Development: The team builds retrieval-augmented generation chatbots that answer questions based on uploaded company documents and knowledge bases. Technologies Used: Python, LangChain, FAISS, Chroma, OpenAI, Streamlit
-
-Cloud Solutions: The company helps clients deploy, scale, and manage applications on cloud platforms with secure architecture and monitoring. Technologies Used: AWS, Azure, Docker, Kubernetes, Linux
-
-UI/UX Design: Scaller Technologies designs intuitive interfaces and smooth user journeys for web and mobile applications. Technologies Used: Figma, Adobe XD, Wireframing, Prototyping, Design Systems
-
-API Development: The team develops robust REST and GraphQL APIs for integrations, mobile apps, and third-party platforms. Technologies Used: FastAPI, Django REST Framework, Express.js, Postman, Swagger
-
-Maintenance & Support: The company offers ongoing technical support, bug fixing, performance monitoring, and feature upgrades after launch. Technologies Used: GitHub Actions, monitoring tools, CI/CD pipelines, logging dashboards
+Web Development
+Mobile App Development
+AI Development
+Cloud Solutions
+UI/UX Design
+API development
+Maintenance & Support
+--------------------------------
 
 6. Technologies Used
 
@@ -61,6 +58,7 @@ Database: PostgreSQL, MySQL, MongoDB, SQLite
 AI: OpenAI APIs, LangChain, Chroma, FAISS, TensorFlow, PyTorch
 
 Cloud: AWS, Azure, Docker, Kubernetes, Google Cloud Platform
+--------------------------------
 
 7. Team
 
@@ -74,37 +72,20 @@ Project Manager: Kavya Joshi coordinates timelines, client communication, resour
 
 AI Engineer: Devansh Rao develops machine learning models, chatbot systems, and intelligent automation features for clients.
 
+--------------------------------
+
 8. Completed Projects
 
-Project Name: SmartHealth Portal; Client: MedCare Diagnostics; Description: Built a healthcare portal for appointment booking, patient records, and doctor scheduling; Technologies Used: React, Node.js, PostgreSQL
+Project Name: SmartHealth Portal
+Project Name: RetailFlow Dashboard
+Project Name: LearnBuddy 
+Project Name: RAG Knowledge Assistant
+Project Name: CloudOps Migration
+Project Name: EventSphere Booking Platform
+Project Name: FinTrack Finance App
 
-Project Name: RetailFlow Dashboard; Client: UrbanCart Retail; Description: Designed a sales and inventory analytics dashboard for a regional retail chain; Technologies Used: Python, Flask, MySQL, Power BI
-
-Project Name: LearnBuddy Mobile App; Client: SkillBridge Education; Description: Developed a student learning app with live classes, notes, and progress tracking; Technologies Used: Flutter, Firebase, REST API
-
-Project Name: AutoSupport AI Chatbot; Client: GreenLine Logistics; Description: Created an AI assistant for customer support and shipment tracking inquiries; Technologies Used: Python, OpenAI, FastAPI, MongoDB
-
-Project Name: RAG Knowledge Assistant; Client: Apex Legal Services; Description: Built a document-based chatbot that answers legal questions from uploaded policy files; Technologies Used: LangChain, Chroma, Streamlit, Azure
-
-Project Name: CloudOps Migration; Client: NorthStar Manufacturing; Description: Migrated legacy systems to the cloud with better uptime and monitoring capabilities; Technologies Used: AWS, Docker, Kubernetes
-
-Project Name: EventSphere Booking Platform; Client: Celebration House; Description: Built an online event booking system with payment integration and organizer dashboards; Technologies Used: Next.js, Stripe, PostgreSQL
-
-Project Name: FinTrack Finance App; Client: BrightLedger; Description: Developed a finance tracking app with budget planning and monthly expense insights; Technologies Used: React Native, SQLite, Firebase
-
-9. Pricing
-
-Portfolio Website: Starting from ₹25,000
-
-Business Website: Starting from ₹60,000
-
-E-commerce Website: Starting from ₹1,20,000
-
-AI Chatbot: Starting from ₹75,000
-
-RAG Chatbot: Starting from ₹1,50,000
-
-10. Internship Program
+--------------------------------
+9. Internship Program
 
 Duration: 8 weeks
 
@@ -115,6 +96,7 @@ Technologies: Python, JavaScript, React, AI basics, Git, APIs
 Certificate: Provided on successful completion
 
 Stipend: ₹8,000 per month for selected interns
+--------------------------------
 
 11. FAQs
 
@@ -138,26 +120,7 @@ FAQ 9: Do you provide UI/UX design separately? Answer: Yes, UI/UX services can b
 
 FAQ 10: Is source code handed over to the client? Answer: Yes, clients receive the final source code and deployment access based on the agreed contract.
 
-FAQ 11: How long does a website project take? Answer: A basic website usually takes 1 to 2 weeks, while a larger web platform may take several weeks.
-
-FAQ 12: Can you build mobile apps for both iOS and Android? Answer: Yes, the company develops cross-platform and native mobile apps for both operating systems.
-
-FAQ 13: Do you work with existing business systems? Answer: Yes, the team can integrate new software with existing tools and databases.
-
-FAQ 14: Are your services suitable for small businesses? Answer: Yes, Scaller Technologies offers scalable packages that fit small and medium-sized businesses.
-
-FAQ 15: Can you create chatbots for customer support? Answer: Yes, the company develops support chatbots for FAQs, lead capture, and basic customer assistance.
-
-FAQ 16: What is the typical project engagement model? Answer: Projects usually begin with discovery, design, development, testing, deployment, and post-launch support.
-
-FAQ 17: Can interns work on real client projects? Answer: Yes, internship participants may contribute to live projects under supervision and guidance.
-
-FAQ 18: Is training provided during internships? Answer: Yes, interns receive task guidance, code reviews, and technical support during their program.
-
-FAQ 19: How can I contact Scaller Technologies? Answer: You can contact the company through phone, email, or the official website.
-
-FAQ 20: What makes Scaller Technologies different? Answer: The company combines modern technology, practical business understanding, and consistent support to deliver useful software products.
-
+--------------------------------
 12. Social Links
 
 Website: www.scallertechnologies.com

@@ -9,11 +9,12 @@ col = db.get_collection("company")
 
 
 def search(question):
+
     e = model.encode(question).tolist()
 
     result = col.query(
         query_embeddings=[e],
-        n_results=1
+        n_results=3
     )
 
-    return result["documents"][0][0]
+    return "\n\n".join(result["documents"][0])
