@@ -9,55 +9,151 @@ Founder: Ananya Patel
 CEO: Rohan Mehta
 
 Headquarters: Ahmedabad, Gujarat, India
---------------------------------
 
 Company Description: Scaller Technologies is a growing software development company that helps startups, SMEs, and enterprises build digital products with modern technology, practical strategy, and dependable support.
+
 --------------------------------
 
 2. Vision
-
 Scaller Technologies aims to become a leading digital innovation partner in India by helping businesses transform ideas into scalable and user-friendly software solutions.
---------------------------------
-
 3. Mission
 Scaller Technologies is committed to delivering reliable software products, smart automation, and efficient digital experiences that improve business growth and customer satisfaction.
 --------------------------------
 
 4. Contact Information
 
-Address: 402, Silver Crest Plaza, SG Highway, Ahmedabad, Gujarat, India
-
-Phone: +91 79 4466 2211
-
+Address: 402, Silver Crest Plaza, SG Highway, Ahmedabad, Gujarat, IndiaPhone: +91 79 4466 2211
 Email: contact@scallertechnologies.com
-
 Website: www.scallertechnologies.com
+Business Hours: Monday to Friday, 9:30 AM to 7:00 PM; Saturday, 10:00 AM to 2:00 PM
+
 --------------------------------
 
-Business Hours: Monday to Friday, 9:30 AM to 7:00 PM; Saturday, 10:00 AM to 2:00 PM
---------------------------------
 
 5. Services
+
 Web Development
+
+Description:
+Scaller Technologies develops responsive websites for businesses, startups, educational institutes, and e-commerce companies. Every website is designed to be fast, secure, and mobile-friendly.
+
+Technologies Used:
+HTML, CSS, JavaScript, React, Next.js, FastAPI
+
+
 Mobile App Development
+
+Description:
+The company develops Android and iOS applications for healthcare, retail, logistics, finance, and education businesses.
+
+Technologies Used:
+Flutter, React Native, Kotlin, Firebase
+
+
 AI Development
+
+Description:
+Scaller Technologies builds AI-powered applications such as chatbots, recommendation systems, document analysis tools, automation software, and predictive analytics solutions.
+
+Technologies Used:
+Python, TensorFlow, PyTorch, Scikit-learn
+
+
+RAG Chatbot Development
+
+Description:
+The company develops Retrieval-Augmented Generation (RAG) chatbots that answer questions using company documents instead of relying only on the LLM.
+
+Technologies Used:
+Python, ChromaDB, Sentence Transformers, FastAPI, Streamlit, Groq
+
+
 Cloud Solutions
+
+Description:
+The company deploys applications on AWS and Azure while managing servers, monitoring systems, backups, and security.
+
+Technologies Used:
+AWS, Azure, Docker, Kubernetes
+
+
 UI/UX Design
-API development
-Maintenance & Support
+
+Description:
+The design team creates modern interfaces, user flows, dashboards, mobile screens, and prototypes for better user experience.
+
+Technologies Used:
+Figma, Adobe XD
+
+
 --------------------------------
 
 6. Technologies Used
 
-Backend: Python, Node.js, Django, FastAPI, Express.js
+Backend Technologies
 
-Frontend: React, Next.js, HTML, CSS, JavaScript, Flutter
+Python
 
-Database: PostgreSQL, MySQL, MongoDB, SQLite
+FastAPI
 
-AI: OpenAI APIs, LangChain, Chroma, FAISS, TensorFlow, PyTorch
+Django
 
-Cloud: AWS, Azure, Docker, Kubernetes, Google Cloud Platform
+Node.js
+
+Express.js
+
+
+
+Frontend Technologies
+
+React
+
+Next.js
+
+HTML
+
+CSS
+
+JavaScript
+
+Flutter
+
+
+Database Technologies
+
+MySQL
+
+PostgreSQL
+
+MongoDB
+
+SQLite
+
+
+Artificial Intelligence
+
+Sentence Transformers
+
+TensorFlow
+
+PyTorch
+
+Scikit-learn
+
+Groq
+
+
+
+
+Cloud Technologies
+
+AWS
+
+Azure
+
+Docker
+
+Kubernetes
 --------------------------------
 
 7. Team
@@ -70,21 +166,67 @@ HR Manager: Nilesh Verma handles recruitment, employee onboarding, training, and
 
 Project Manager: Kavya Joshi coordinates timelines, client communication, resources, and delivery across multiple software projects.
 
-AI Engineer: Devansh Rao develops machine learning models, chatbot systems, and intelligent automation features for clients.
 
 --------------------------------
 
 8. Completed Projects
 
-Project Name: SmartHealth Portal
-Project Name: RetailFlow Dashboard
-Project Name: LearnBuddy 
-Project Name: RAG Knowledge Assistant
-Project Name: CloudOps Migration
-Project Name: EventSphere Booking Platform
-Project Name: FinTrack Finance App
+1. Project Name:
+SmartHealth Portal
+
+Client:
+MedCare Diagnostics
+
+Description:
+A hospital management system that allows patients to book appointments, doctors to manage schedules, and hospitals to maintain patient records online.
+
+Technologies Used:
+React, FastAPI, PostgreSQL
+
+
+2.Project Name:
+RetailFlow Dashboard
+
+Client:
+UrbanCart Retail
+
+Description:
+A dashboard for monitoring product sales, inventory, and business performance in real time.
+
+Technologies Used:
+Python, Flask, MySQL
+
+
+3. Project Name:
+LearnBuddy Mobile App
+
+Client:
+SkillBridge Education
+
+Description:
+A mobile learning application where students can attend live classes, read notes, complete quizzes, and track progress.
+
+Technologies Used:
+Flutter, Firebase
+
+
+4. Project Name:
+AutoSupport AI Chatbot
+
+Client:
+GreenLine Logistics
+
+Description:
+An AI chatbot that answers customer questions related to shipment tracking and delivery updates.
+
+Technologies Used:
+Python, FastAPI, Groq
+
+
 
 --------------------------------
+
+
 9. Internship Program
 
 Duration: 8 weeks
@@ -121,6 +263,7 @@ FAQ 9: Do you provide UI/UX design separately? Answer: Yes, UI/UX services can b
 FAQ 10: Is source code handed over to the client? Answer: Yes, clients receive the final source code and deployment access based on the agreed contract.
 
 --------------------------------
+
 12. Social Links
 
 Website: www.scallertechnologies.com
