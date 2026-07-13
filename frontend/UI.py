@@ -1,6 +1,9 @@
 import streamlit as st
 import requests
 
+# Backend API URL
+API_URL = "https://scaller-bot.onrender.com/chat"
+
 st.set_page_config(
     page_title="Scaller AI Assistant",
     page_icon="🤖",
@@ -34,7 +37,6 @@ div.stButton > button{
     color:white;
 }
 
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -49,20 +51,23 @@ question = st.text_input("Enter your question")
 
 if st.button("Ask"):
 
-    if question == "":
+    if question.strip() == "":
         st.warning("Please enter a question.")
 
     else:
-
         with st.spinner("Generating answer..."):
+            try:
+                response = requests.post(
+                    API_URL,
+                    json={"question": question}
+                )
 
-            response = requests.post(
-                "http://127.0.0.1:8000/chat",
-                json={"question": question}
-            )
+                if response.status_code == 200:
+                    answer = response.json()["answer"]
+                    st.subheader("Answer")
+                    st.info(answer)
+                else:
+                    st.error(f"Server Error: {response.status_code}")
 
-            answer = response.json()["answer"]
-
-        st.subheader("Answer")
-
-        st.info(answer)
+            except Exception as e:
+                st.error(f"Error: {e}")
