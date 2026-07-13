@@ -1,33 +1,33 @@
-from sentence_transformers import SentenceTransformer
 from groq import Groq
 from dotenv import load_dotenv
-import chromadb
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 import os
 
 load_dotenv()
 
-model = SentenceTransformer("all-MiniLM-L6-v2")
-
-db = chromadb.PersistentClient(path="chroma_db")
-
-try:
-    col = db.get_collection("company")
-except:
-    import embed
-    col = db.get_collection("company")
+# Load Groq API
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+# Read company data
+with open("data.txt", "r", encoding="utf-8") as file:
+    documents = file.read().split("--------------------------------")
+
+# Create TF-IDF vectors
+vectorizer = TfidfVectorizer()
+document_vectors = vectorizer.fit_transform(documents)
 
 
 def search(question):
+    # Convert question into TF-IDF vector
+    question_vector = vectorizer.transform([question])
 
-    embedding = model.encode(question).tolist()
+    # Find similarity with all documents
+    similarity = cosine_similarity(question_vector, document_vectors)
 
-    result = col.query(
-        query_embeddings=[embedding],
-        n_results=1
-    )
-
-    context = result["documents"][0][0]
+    # Get the most relevant document
+    index = similarity.argmax()
+    context = documents[index]
 
     prompt = f"""
 You are an AI assistant for Scaller Technologies.
