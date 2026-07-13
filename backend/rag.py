@@ -9,8 +9,12 @@ load_dotenv()
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
 db = chromadb.PersistentClient(path="chroma_db")
-col = db.get_collection("company")
 
+try:
+    col = db.get_collection("company")
+except:
+    import embed
+    col = db.get_collection("company")
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 
