@@ -12,3 +12,5 @@ pydantic
 numpy
 pandas
 scikit-learn
+groq
+requests
