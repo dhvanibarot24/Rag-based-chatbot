@@ -1,17 +1,26 @@
 import streamlit as st
-import requests
+import websocket
 import uuid
 
-# Backend API URL
-API_URL = "https://scaller-bot.onrender.com/chat"
+
+LOCAL = True
+
+if LOCAL:
+    WS_URL = "ws://127.0.0.1:8000/ws"
+else:
+    WS_URL = "wss://scaller-bot.onrender.com/ws"
+
 
 st.set_page_config(
     page_title="Scaller AI Assistant",
     page_icon="🤖",
     layout="centered"
 )
+
+
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
+
 
 st.markdown("""
 <style>
@@ -43,7 +52,11 @@ div.stButton > button{
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h1>🤖 Scaller Technologies AI Assistant</h1>", unsafe_allow_html=True)
+
+st.markdown(
+    "<h1>🤖 Scaller Technologies AI Assistant</h1>",
+    unsafe_allow_html=True
+)
 
 st.markdown(
     "<p>Ask anything about Scaller Technologies</p>",
@@ -51,6 +64,7 @@ st.markdown(
 )
 
 question = st.text_input("Enter your question")
+
 
 if st.button("Ask"):
 
@@ -60,20 +74,16 @@ if st.button("Ask"):
     else:
         with st.spinner("Generating answer..."):
             try:
-                response = requests.post(
-                    API_URL,
-                    json={
-                             "session_id": st.session_state.session_id,
-                             "question": question
-}
-                )
+                ws = websocket.create_connection(WS_URL)
 
-                if response.status_code == 200:
-                    answer = response.json()["answer"]
-                    st.subheader("Answer")
-                    st.info(answer)
-                else:
-                    st.error(f"Server Error: {response.status_code}")
+                ws.send(question)
+
+                answer = ws.recv()
+
+                ws.close()
+
+                st.subheader("Answer")
+                st.info(answer)
 
             except Exception as e:
                 st.error(f"Error: {e}")
