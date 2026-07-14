@@ -1,13 +1,19 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
-from rag import search
 from collections import deque
+from rag import search
 
 app = FastAPI()
 
-
-# Stores memory for each session
+# -----------------------------------
+# REST API Memory
+# -----------------------------------
 chat_memory = {}
+
+# -----------------------------------
+# WebSocket Memory
+# -----------------------------------
+ws_memory = {}
 
 
 class Chat(BaseModel):
@@ -15,57 +21,79 @@ class Chat(BaseModel):
     question: str
 
 
+# -----------------------------------
+# REST Endpoint
+# -----------------------------------
 @app.post("/chat")
 def chat(data: Chat):
 
-    # Create memory for new session
     if data.session_id not in chat_memory:
         chat_memory[data.session_id] = deque(maxlen=4)
 
-    # Get previous conversation
     history = list(chat_memory[data.session_id])
 
-    # Get answer
-    answer = search(data.question, history)
+    answer = search(
+        data.question,
+        history
+    )
 
-    # Save current interaction
-    chat_memory[data.session_id].append({
-        "question": data.question,
+    chat_memory[data.session_id].append(
+        {
+            "question": data.question,
+            "answer": answer
+        }
+    )
+
+    return {
         "answer": answer
-    })
-
-    return {"answer": answer}
-
+    }
+# -----------------------------------
+# WebSocket Endpoint
+# -----------------------------------
 @app.websocket("/ws")
 async def websocket_chat(websocket: WebSocket):
 
-    print("WebSocket endpoint called")
-
     await websocket.accept()
 
-    print("Client connected")
-
-    session_memory = deque(maxlen=4)
-
     try:
+
         while True:
 
-            question = await websocket.receive_text()
-            print("Question:", question)
+            # Receive JSON from Streamlit
+            data = await websocket.receive_json()
 
-            history = list(session_memory)
+            session_id = data["session_id"]
+            question = data["question"]
 
-            answer = search(question, history)
+            # Create memory for new session
+            if session_id not in ws_memory:
+                ws_memory[session_id] = deque(maxlen=4)
 
-            print("Answer:", answer)
+            # Get previous conversation
+            history = list(ws_memory[session_id])
 
-            session_memory.append({
-                "question": question,
-                "answer": answer
-            })
+            # Generate answer
+            answer = search(
+                question,
+                history
+            )
 
-            await websocket.send_text(answer)
+            # Save current interaction
+            ws_memory[session_id].append(
+                {
+                    "question": question,
+                    "answer": answer
+                }
+            )
+
+            # Send response back
+            await websocket.send_json(
+                {
+                    "answer": answer
+                }
+            )
 
     except WebSocketDisconnect:
-        print("Client disconnected")
-        session_memory.clear()
+
+        # Connection closed
+        pass

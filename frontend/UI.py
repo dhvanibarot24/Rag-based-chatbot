@@ -1,8 +1,11 @@
 import streamlit as st
 import websocket
 import uuid
+import json
 
-
+# -----------------------------
+# WebSocket URL
+# -----------------------------
 LOCAL = True
 
 if LOCAL:
@@ -10,18 +13,25 @@ if LOCAL:
 else:
     WS_URL = "wss://scaller-bot.onrender.com/ws"
 
-
+# -----------------------------
+# Streamlit Page Config
+# -----------------------------
 st.set_page_config(
     page_title="Scaller AI Assistant",
     page_icon="🤖",
     layout="centered"
 )
 
-
+# -----------------------------
+# Session ID
+# -----------------------------
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
+st.write("Session ID:", st.session_state.session_id)
 
-
+# -----------------------------
+# CSS
+# -----------------------------
 st.markdown("""
 <style>
 
@@ -52,7 +62,9 @@ div.stButton > button{
 </style>
 """, unsafe_allow_html=True)
 
-
+# -----------------------------
+# Heading
+# -----------------------------
 st.markdown(
     "<h1>🤖 Scaller Technologies AI Assistant</h1>",
     unsafe_allow_html=True
@@ -63,33 +75,47 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# -----------------------------
+# Question Input
+# -----------------------------
 question = st.text_input("Enter your question")
 
-
+# -----------------------------
+# Ask Button
+# -----------------------------
 if st.button("Ask"):
 
     if question.strip() == "":
-        st.warning("Please enter a question.")
+        st.warning("Please enter your question.")
 
     else:
-        with st.spinner("Generating answer..."):
-            try:
-                st.write("Connecting to:", WS_URL)
 
+        with st.spinner("Generating answer..."):
+
+            try:
+
+                # Connect to WebSocket
                 ws = websocket.create_connection(WS_URL)
 
-                st.success("Connected to WebSocket")
+                # Send session id + question
+                ws.send(json.dumps({
+                    "session_id": st.session_state.session_id,
+                    "question": question
+                }))
 
-                st.write("Sending:", question)
+                # Receive response
+                response = ws.recv()
 
-                ws.send(question)
+                # Convert JSON string to dictionary
+                response = json.loads(response)
 
-                answer = ws.recv()
+                # Get answer
+                answer = response["answer"]
 
-                st.write("Received:", answer)
-
+                # Close WebSocket
                 ws.close()
 
+                # Display answer
                 st.subheader("Answer")
                 st.info(answer)
 
