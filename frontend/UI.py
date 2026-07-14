@@ -74,11 +74,19 @@ if st.button("Ask"):
     else:
         with st.spinner("Generating answer..."):
             try:
+                st.write("Connecting to:", WS_URL)
+
                 ws = websocket.create_connection(WS_URL)
+
+                st.success("Connected to WebSocket")
+
+                st.write("Sending:", question)
 
                 ws.send(question)
 
                 answer = ws.recv()
+
+                st.write("Received:", answer)
 
                 ws.close()
 

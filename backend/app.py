@@ -39,31 +39,33 @@ def chat(data: Chat):
 @app.websocket("/ws")
 async def websocket_chat(websocket: WebSocket):
 
+    print("WebSocket endpoint called")
+
     await websocket.accept()
+
+    print("Client connected")
 
     session_memory = deque(maxlen=4)
 
     try:
-
         while True:
 
             question = await websocket.receive_text()
+            print("Question:", question)
 
             history = list(session_memory)
 
             answer = search(question, history)
 
-         
+            print("Answer:", answer)
+
             session_memory.append({
                 "question": question,
                 "answer": answer
             })
 
-            
             await websocket.send_text(answer)
 
     except WebSocketDisconnect:
-
         print("Client disconnected")
-
         session_memory.clear()
