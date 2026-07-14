@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+import uuid
 
 # Backend API URL
 API_URL = "https://scaller-bot.onrender.com/chat"
@@ -9,6 +10,8 @@ st.set_page_config(
     page_icon="🤖",
     layout="centered"
 )
+if "session_id" not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())
 
 st.markdown("""
 <style>
@@ -59,7 +62,10 @@ if st.button("Ask"):
             try:
                 response = requests.post(
                     API_URL,
-                    json={"question": question}
+                    json={
+                             "session_id": st.session_state.session_id,
+                             "question": question
+}
                 )
 
                 if response.status_code == 200:
