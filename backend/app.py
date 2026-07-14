@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from rag import search
 from collections import deque
@@ -35,3 +35,35 @@ def chat(data: Chat):
     })
 
     return {"answer": answer}
+
+@app.websocket("/ws")
+async def websocket_chat(websocket: WebSocket):
+
+    await websocket.accept()
+
+    session_memory = deque(maxlen=4)
+
+    try:
+
+        while True:
+
+            question = await websocket.receive_text()
+
+            history = list(session_memory)
+
+            answer = search(question, history)
+
+         
+            session_memory.append({
+                "question": question,
+                "answer": answer
+            })
+
+            
+            await websocket.send_text(answer)
+
+    except WebSocketDisconnect:
+
+        print("Client disconnected")
+
+        session_memory.clear()

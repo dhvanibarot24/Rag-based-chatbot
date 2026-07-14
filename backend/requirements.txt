@@ -6,3 +6,4 @@ python-dotenv
 requests
 scikit-learn
 numpy
+websocket-client
