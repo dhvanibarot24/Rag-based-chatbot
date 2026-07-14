@@ -3,9 +3,9 @@ import websocket
 import uuid
 import json
 
-# -----------------------------
-# WebSocket URL
-# -----------------------------
+# -----------------------------------
+# Backend URL
+# -----------------------------------
 LOCAL = True
 
 if LOCAL:
@@ -13,25 +13,30 @@ if LOCAL:
 else:
     WS_URL = "wss://scaller-bot.onrender.com/ws"
 
-# -----------------------------
-# Streamlit Page Config
-# -----------------------------
+# -----------------------------------
+# Page Config
+# -----------------------------------
 st.set_page_config(
     page_title="Scaller AI Assistant",
     page_icon="🤖",
     layout="centered"
 )
 
-# -----------------------------
+# -----------------------------------
 # Session ID
-# -----------------------------
+# -----------------------------------
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
-st.write("Session ID:", st.session_state.session_id)
 
-# -----------------------------
-# CSS
-# -----------------------------
+# -----------------------------------
+# Chat History
+# -----------------------------------
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# -----------------------------------
+# Styling
+# -----------------------------------
 st.markdown("""
 <style>
 
@@ -44,80 +49,80 @@ h1{
     color:#1E3A8A;
 }
 
-p{
-    text-align:center;
-    font-size:18px;
-}
-
-div.stButton > button{
-    width:100%;
-    height:50px;
-    border-radius:12px;
-    font-size:18px;
-    font-weight:bold;
-    background-color:#2563EB;
-    color:white;
-}
-
 </style>
 """, unsafe_allow_html=True)
 
-# -----------------------------
-# Heading
-# -----------------------------
 st.markdown(
     "<h1>🤖 Scaller Technologies AI Assistant</h1>",
     unsafe_allow_html=True
 )
+# -----------------------------------
+# Display Previous Messages
+# -----------------------------------
+for message in st.session_state.messages:
 
-st.markdown(
-    "<p>Ask anything about Scaller Technologies</p>",
-    unsafe_allow_html=True
-)
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-# -----------------------------
-# Question Input
-# -----------------------------
-question = st.text_input("Enter your question")
 
-# -----------------------------
-# Ask Button
-# -----------------------------
-if st.button("Ask"):
+# -----------------------------------
+# Chat Input
+# -----------------------------------
+question = st.chat_input("Ask anything about Scaller Technologies...")
 
-    if question.strip() == "":
-        st.warning("Please enter your question.")
 
-    else:
+# -----------------------------------
+# Send Question
+# -----------------------------------
+if question:
 
-        with st.spinner("Generating answer..."):
+    # Show user message
+    st.session_state.messages.append(
+        {
+            "role": "user",
+            "content": question
+        }
+    )
 
-            try:
+    with st.chat_message("user"):
+        st.markdown(question)
 
-                # Connect to WebSocket
-                ws = websocket.create_connection(WS_URL)
+    # Get bot response
+    with st.spinner("Thinking..."):
 
-                # Send session id + question
-                ws.send(json.dumps({
-                    "session_id": st.session_state.session_id,
-                    "question": question
-                }))
+        try:
 
-                # Receive response
-                response = ws.recv()
+            # Connect to WebSocket
+            ws = websocket.create_connection(WS_URL)
 
-                # Convert JSON string to dictionary
-                response = json.loads(response)
+            # Send question
+            ws.send(
+                json.dumps(
+                    {
+                        "session_id": st.session_state.session_id,
+                        "question": question
+                    }
+                )
+            )
 
-                # Get answer
-                answer = response["answer"]
+            # Receive response
+            response = json.loads(ws.recv())
 
-                # Close WebSocket
-                ws.close()
+            ws.close()
 
-                # Display answer
-                st.subheader("Answer")
-                st.info(answer)
+            answer = response["answer"]
 
-            except Exception as e:
-                st.error(f"Error: {e}")
+        except Exception as e:
+
+            answer = f"Connection Error: {e}"
+
+    # Save bot response
+    st.session_state.messages.append(
+        {
+            "role": "assistant",
+            "content": answer
+        }
+    )
+
+    with st.chat_message("assistant"):
+        st.markdown(answer)
