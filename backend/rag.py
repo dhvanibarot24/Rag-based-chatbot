@@ -6,23 +6,21 @@ import os
 
 load_dotenv()
 
-# Load Groq API
+
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 # Read company data
 with open("data.txt", "r", encoding="utf-8") as file:
     documents = file.read().split("--------------------------------")
 
-# Create TF-IDF vectors
+
 vectorizer = TfidfVectorizer()
 document_vectors = vectorizer.fit_transform(documents)
 
 
 def search(question, history):
 
-    # ----------------------------
-    # Create search query using history
-    # ----------------------------
+   
     search_query = question
 
     if history:
@@ -31,15 +29,13 @@ def search(question, history):
         )
         search_query = previous_questions + " " + question
 
-    # Convert query into vector
+   
     question_vector = vectorizer.transform([search_query])
 
     # Calculate similarity
     similarity = cosine_similarity(question_vector, document_vectors)[0]
 
-    # ----------------------------
-    # Get Top 3 most relevant documents
-    # ----------------------------
+   
     top_indices = similarity.argsort()[-3:][::-1]
 
     context = ""
