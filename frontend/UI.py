@@ -3,10 +3,10 @@ import websocket
 import uuid
 import json
 import requests
-import streamlit.components.v1 as components
 from streamlit_mic_recorder import speech_to_text
+
 # ==========================================================
-# BACKEND URL
+# BACKEND CONFIG
 # ==========================================================
 
 LOCAL = True
@@ -39,111 +39,123 @@ if "session_id" not in st.session_state:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+if "chat_input" not in st.session_state:
+    st.session_state.chat_input = ""
+
+# ✅ Fixed missing session state
+if "voice_text" not in st.session_state:
+    st.session_state.voice_text = ""
+
 # ==========================================================
-# CSS
+# CUSTOM CSS
 # ==========================================================
 
 st.markdown("""
 <style>
 
-/* Hide Streamlit */
+/* Hide Streamlit UI */
+
 #MainMenu{
-visibility:hidden;
+    visibility:hidden;
 }
 
 header{
-visibility:hidden;
+    visibility:hidden;
 }
 
 footer{
-visibility:hidden;
+    visibility:hidden;
 }
 
 /* Background */
+
 .stApp{
-background:linear-gradient(135deg,#EEF5FF,#DCEEFF);
+    background:linear-gradient(135deg,#EEF5FF,#DCEEFF);
 }
 
-/* Main Container */
+/* Main Width */
+
 .block-container{
-max-width:950px;
-padding-top:20px;
-padding-bottom:20px;
-}
-
-/* Header */
-
-.main-header{
-background:white;
-border-radius:20px;
-padding:25px;
-box-shadow:0 5px 20px rgba(0,0,0,.08);
-margin-bottom:20px;
-text-align:center;
-}
-
-.title{
-font-size:34px;
-font-weight:700;
-color:#2563EB;
-}
-
-.subtitle{
-color:#6B7280;
-font-size:17px;
-margin-top:8px;
+    max-width:950px;
+    padding-top:20px;
+    padding-bottom:20px;
 }
 
 /* Sidebar */
 
 section[data-testid="stSidebar"]{
-background:#1E3A8A;
+    background:#1E3A8A;
 }
 
 section[data-testid="stSidebar"] *{
-color:white;
+    color:white;
+}
+
+/* Header */
+
+.header{
+    background:white;
+    padding:25px;
+    border-radius:18px;
+    box-shadow:0px 5px 18px rgba(0,0,0,.08);
+    margin-bottom:25px;
+    text-align:center;
+}
+
+.header h1{
+    color:#2563EB;
+    margin-bottom:8px;
+}
+
+.header p{
+    color:#6B7280;
+    font-size:17px;
 }
 
 /* Chat */
 
 [data-testid="stChatMessage"]{
+    background:white;
+    border-radius:18px;
+    padding:12px;
+    margin-bottom:10px;
+    box-shadow:0px 2px 8px rgba(0,0,0,.05);
+}
 
-border-radius:15px;
-padding:5px;
-margin-bottom:8px;
+/* Textbox */
 
+.stTextInput input{
+    height:56px;
+    border-radius:16px;
+    border:2px solid #D9E2F2 !important;
+    background:#F9FBFF;
+    font-size:16px;
+    padding-left:18px;
+    transition:all .25s;
+}
+
+.stTextInput input:focus{
+    border:2px solid #2563EB !important;
+    background:white;
+    box-shadow:0px 0px 12px rgba(37,99,235,.18);
 }
 
 /* Buttons */
 
-.stButton>button{
-
-width:100%;
-height:46px;
-
-border:none;
-border-radius:12px;
-
-background:#2563EB;
-color:white;
-
-font-weight:bold;
-
+.stButton button{
+    height:56px;
+    border-radius:16px;
+    background:#2563EB;
+    color:white;
+    font-size:22px;
+    font-weight:700;
+    border:none;
+    transition:.25s;
 }
 
-.stButton>button:hover{
-
-background:#1D4ED8;
-
-}
-
-/* Chat Input */
-
-[data-testid="stChatInput"]{
-
-position:sticky;
-bottom:0;
-
+.stButton button:hover{
+    background:#1D4ED8;
+    transform:translateY(-2px);
 }
 
 /* Mobile */
@@ -151,21 +163,16 @@ bottom:0;
 @media(max-width:768px){
 
 .block-container{
-
-padding:15px;
-
+padding-left:15px;
+padding-right:15px;
 }
 
-.title{
-
-font-size:27px;
-
+.header h1{
+font-size:28px;
 }
 
-.subtitle{
-
+.header p{
 font-size:15px;
-
 }
 
 }
@@ -192,52 +199,34 @@ with st.sidebar:
     if st.button("🗑️ Clear Chat"):
 
         try:
-
             requests.delete(
-
                 f"{API_URL}/clear-session",
-
                 json={
-                    "session_id":st.session_state.session_id
+                    "session_id": st.session_state.session_id
                 }
-
             )
 
-        except:
-
+        except Exception:
             pass
 
-        st.session_state.messages=[]
-
-        st.session_state.session_id=str(uuid.uuid4())
+        st.session_state.messages = []
+        st.session_state.chat_input = ""
+        st.session_state.voice_text = ""
+        st.session_state.session_id = str(uuid.uuid4())
 
         st.rerun()
-
-
-
 # ==========================================================
 # HEADER
 # ==========================================================
 
 st.markdown("""
-
-<div class="main-header">
-
-<div class="title">
-
-🤖 Scaller AI Assistant
-
+<div class="header">
+    <h1>🤖 Scaller AI Assistant</h1>
+    <p>
+        Ask anything about Scaller Technologies using text or voice.
+    </p>
 </div>
-
-<div class="subtitle">
-
-Ask anything about Scaller Technologies using text or voice.
-
-</div>
-
-</div>
-
-""",unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 # ==========================================================
 # CHAT HISTORY
@@ -245,473 +234,146 @@ Ask anything about Scaller Technologies using text or voice.
 
 for message in st.session_state.messages:
 
-    avatar="👤" if message["role"]=="user" else "🤖"
+    avatar = "👤" if message["role"] == "user" else "🤖"
 
-    with st.chat_message(message["role"],avatar=avatar):
-
+    with st.chat_message(message["role"], avatar=avatar):
         st.markdown(message["content"])
 
+
 # ==========================================================
-# INPUT SECTION
+# VOICE INPUT
 # ==========================================================
 
-# Store voice text separately
-if "voice_text" not in st.session_state:
-    st.session_state.voice_text = ""
-
-# -----------------------------
-# Voice Input
-# -----------------------------
-
-st.markdown("### 🎤 Speak")
+st.markdown("""
+<div style="
+font-size:15px;
+font-weight:600;
+color:#2563EB;
+margin-bottom:8px;
+">
+🎤 Voice Input
+</div>
+""", unsafe_allow_html=True)
 
 voice = speech_to_text(
     language="en",
-    start_prompt="🎤 Start Speaking",
-    stop_prompt="⏹ Stop",
+    start_prompt="Start Speaking",
+    stop_prompt="⏹ Stop Recording",
     just_once=True,
-    use_container_width=True,
+    use_container_width=False,
     key="voice"
 )
 
-# If speech is recognized,
-# fill the textbox and rerun.
 if voice:
-
     st.session_state.voice_text = voice
 
-    st.rerun()
+# ==========================================================
+# CHAT FORM
+# ==========================================================
 
-# -----------------------------
-# Input Row
-# -----------------------------
+st.subheader("💬 Ask your question")
 
-col1, col2 = st.columns([8,1])
+with st.form("chat_form", clear_on_submit=True):
 
-with col1:
+    col1, col2 = st.columns([9, 1])
 
-    typed_text = st.text_input(
-        "",
-        value=st.session_state.voice_text,
-        key="chat_input",
-        placeholder="Ask anything about Scaller Technologies...",
-        label_visibility="collapsed"
-    )
+    with col1:
 
-with col2:
+        question = st.text_input(
+            "",
+            value=st.session_state.get("voice_text", ""),
+            placeholder="Ask anything about Scaller Technologies...",
+            label_visibility="collapsed"
+        )
 
-    send = st.button(
-        "➤",
-        use_container_width=True
-    )
+    with col2:
 
-question = None
+        send = st.form_submit_button("➤", use_container_width=True)
 
-if send:
+    if send:
 
-    question = typed_text.strip()
+        question = question.strip()
 
-    # Clear only our own variable
-    st.session_state.voice_text = ""
+        if not question:
 
+            st.warning("Please enter a question.")
+
+        else:
+
+            st.session_state.messages.append(
+                {
+                    "role": "user",
+                    "content": question
+                }
+            )
+
+            ws = None
+
+            try:
+
+                with st.spinner("🤖 Thinking..."):
+
+                    ws = websocket.create_connection(WS_URL)
+
+                    ws.send(
+                        json.dumps(
+                            {
+                                "session_id": st.session_state.session_id,
+                                "question": question
+                            }
+                        )
+                    )
+
+                    response = json.loads(ws.recv())
+
+                    answer = response.get(
+                        "answer",
+                        "I don't have an answer."
+                    )
+
+            except Exception as e:
+
+                answer = (
+                    "⚠️ Unable to connect to the server.\n\n"
+                    "Please make sure the FastAPI backend is running.\n\n"
+                    f"Error: {e}"
+                )
+
+            finally:
+
+                if ws:
+                    ws.close()
+
+            st.session_state.messages.append(
+                {
+                    "role": "assistant",
+                    "content": answer
+                }
+            )
+
+            st.session_state.voice_text = ""
+
+            st.rerun()
 # ==========================================================
 # FOOTER
 # ==========================================================
 
 st.markdown("---")
 
-c1 = st.columns(1)
-
-with c1:
-    st.caption("💬 Text & Voice Assistant")
-
-# ==========================================================
-# SIDEBAR
-# ==========================================================
-
-with st.sidebar:
-
-    st.title("🤖 Scaller AI")
-
-    st.success("🟢 Online")
-
-    st.write("")
-
-    st.markdown("### Session")
-
-    st.caption("Conversation Active")
-
-    if st.button("🗑️ Clear Chat"):
-
-        try:
-
-            requests.delete(
-                f"{API_URL}/clear-session",
-                json={
-                    "session_id": st.session_state.session_id
-                }
-            )
-
-        except:
-            pass
-
-        st.session_state.messages = []
-        st.session_state.chat_input = ""
-        st.session_state.session_id = str(uuid.uuid4())
-
-        st.rerun()
-
-# ==========================================================
-# HEADER
-# ==========================================================
-
 st.markdown(
-"""
-<div class="main-header">
-
-<div class="title">
-🤖 Scaller AI Assistant
-</div>
-
-<div class="subtitle">
-Ask anything about Scaller Technologies using text or voice.
-</div>
-
-</div>
-""",
-unsafe_allow_html=True
-)
-
-# ==========================================================
-# CHAT HISTORY
-# ==========================================================
-
-for message in st.session_state.messages:
-
-    avatar = "👤" if message["role"] == "user" else "🤖"
-
-    with st.chat_message(message["role"], avatar=avatar):
-
-        st.markdown(message["content"])
-
-# ==========================================================
-# INPUT SECTION
-# ==========================================================
-
-st.write("")
-
-col1, col2, col3 = st.columns([8,1,1])
-
-# -----------------------------
-# TEXT INPUT
-# -----------------------------
-
-with col1:
-
-    typed_text = st.text_input(
-        "",
-        key="chat_input",
-        placeholder="Ask anything about Scaller Technologies...",
-        label_visibility="collapsed"
-    )
-
-# -----------------------------
-# MICROPHONE
-# -----------------------------
-
-with col2:
-
-    voice = speech_to_text(
-        language="en",
-        start_prompt="🎤",
-        stop_prompt="⏹",
-        just_once=True,
-        use_container_width=True,
-        key="voice"
-    )
-
-# -----------------------------
-# SEND BUTTON
-# -----------------------------
-
-with col3:
-
-    send = st.button(
-        "➤",
-        use_container_width=True
-    )
-
-# ==========================================================
-# VOICE UX
-# ==========================================================
-
-if voice:
-
-    st.session_state.listening = True
-
-    with st.spinner("🎙️ Recognizing your voice..."):
-
-        st.session_state.chat_input = voice
-
-    st.session_state.listening = False
-
-    st.rerun()
-# ==========================================================
-# SIDEBAR
-# ==========================================================
-
-with st.sidebar:
-
-    st.title("🤖 Scaller AI")
-
-    st.success("🟢 Online")
-
-    st.write("")
-
-    st.markdown("### Session")
-
-    st.caption("Conversation Active")
-
-    if st.button("🗑️ Clear Chat"):
-
-        try:
-
-            requests.delete(
-                f"{API_URL}/clear-session",
-                json={
-                    "session_id": st.session_state.session_id
-                }
-            )
-
-        except:
-            pass
-
-        st.session_state.messages = []
-        st.session_state.chat_input = ""
-        st.session_state.session_id = str(uuid.uuid4())
-
-        st.rerun()
-
-# ==========================================================
-# HEADER
-# ==========================================================
-
-st.markdown(
-"""
-<div class="main-header">
-
-<div class="title">
-🤖 Scaller AI Assistant
-</div>
-
-<div class="subtitle">
-Ask anything about Scaller Technologies using text or voice.
-</div>
-
-</div>
-""",
-unsafe_allow_html=True
-)
-
-# ==========================================================
-# CHAT HISTORY
-# ==========================================================
-
-for message in st.session_state.messages:
-
-    avatar = "👤" if message["role"] == "user" else "🤖"
-
-    with st.chat_message(message["role"], avatar=avatar):
-
-        st.markdown(message["content"])
-
-# ==========================================================
-# INPUT SECTION
-# ==========================================================
-
-st.write("")
-
-col1, col2, col3 = st.columns([8,1,1])
-
-# -----------------------------
-# TEXT INPUT
-# -----------------------------
-
-with col1:
-
-    typed_text = st.text_input(
-        "",
-        key="chat_input",
-        placeholder="Ask anything about Scaller Technologies...",
-        label_visibility="collapsed"
-    )
-
-# -----------------------------
-# MICROPHONE
-# -----------------------------
-
-with col2:
-
-    voice = speech_to_text(
-        language="en",
-        start_prompt="🎤",
-        stop_prompt="⏹",
-        just_once=True,
-        use_container_width=True,
-        key="voice"
-    )
-
-# -----------------------------
-# SEND BUTTON
-# -----------------------------
-
-with col3:
-
-    send = st.button(
-        "➤",
-        use_container_width=True
-    )
-
-# ==========================================================
-# VOICE UX
-# ==========================================================
-
-if voice:
-
-    st.session_state.listening = True
-
-    with st.spinner("🎙️ Recognizing your voice..."):
-
-        st.session_state.chat_input = voice
-
-    st.session_state.listening = False
-
-    st.rerun()
-# ==========================================================
-# AUTO SCROLL
-# ==========================================================
-
-components.html(
     """
-    <script>
-
-    const chatContainer = window.parent.document.querySelector("section.main");
-
-    if(chatContainer){
-        chatContainer.scrollTo({
-            top: chatContainer.scrollHeight,
-            behavior: "smooth"
-        });
-    }
-
-    </script>
-    """,
-    height=0,
-)
-
-# ==========================================================
-# FOOTER
-# ==========================================================
-
-st.markdown("<br>", unsafe_allow_html=True)
-
-st.markdown("---")
-
-left, center, right = st.columns([1,2,1])
-
-with center:
-
-    st.markdown(
-        """
-        <div style="
+    <div style="
         text-align:center;
         color:#6B7280;
         font-size:14px;
-        ">
+        padding-bottom:15px;
+    ">
 
-        🤖 <b>Scaller AI Assistant</b><br>
+    🤖 <b>Scaller AI Assistant</b><br>
 
-        Built using Streamlit & FastAPI
+    Powered by FastAPI • Streamlit • WebSocket
 
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-# ==========================================================
-# EXTRA CSS
-# ==========================================================
-
-st.markdown("""
-<style>
-
-/* Better Chat Bubble */
-
-[data-testid="stChatMessage"]{
-
-background:white;
-
-padding:12px;
-
-border-radius:18px;
-
-margin-bottom:12px;
-
-box-shadow:0 2px 10px rgba(0,0,0,.06);
-
-}
-
-/* Input Section */
-
-.stTextInput{
-
-margin-bottom:0px;
-
-}
-
-/* Send Button */
-
-.stButton button{
-
-height:52px !important;
-
-border-radius:14px !important;
-
-font-size:18px;
-
-}
-
-/* Mic Button */
-
-button[kind="secondary"]{
-
-height:52px !important;
-
-border-radius:14px !important;
-
-}
-
-/* Chat Width */
-
-.block-container{
-
-max-width:900px;
-
-}
-
-/* Mobile */
-
-@media (max-width:768px){
-
-.block-container{
-
-padding-left:15px;
-
-padding-right:15px;
-
-}
-
-}
-
-</style>
-""",unsafe_allow_html=True)
+    </div>
+    """,
+    unsafe_allow_html=True
+)
