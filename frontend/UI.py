@@ -57,6 +57,16 @@ st.markdown(
     unsafe_allow_html=True
 )
 # -----------------------------------
+# Clear Chat Button
+# -----------------------------------
+if st.button("🗑️ Clear Chat"):
+
+    st.session_state.messages = []
+
+    st.session_state.session_id = str(uuid.uuid4())
+
+    st.rerun()
+# -----------------------------------
 # Display Previous Messages
 # -----------------------------------
 for message in st.session_state.messages:
