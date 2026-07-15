@@ -3,6 +3,7 @@ import websocket
 import uuid
 import json
 import requests
+from streamlit_mic_recorder import speech_to_text
 
 # -----------------------------------
 # Backend URL
@@ -11,8 +12,10 @@ LOCAL = True
 
 if LOCAL:
     WS_URL = "ws://127.0.0.1:8000/ws"
+    API_URL = "http://127.0.0.1:8000"
 else:
     WS_URL = "wss://scaller-bot.onrender.com/ws"
+    API_URL = "https://scaller-bot.onrender.com"
 
 # -----------------------------------
 # Page Config
@@ -20,114 +23,253 @@ else:
 st.set_page_config(
     page_title="Scaller AI Assistant",
     page_icon="🤖",
-    layout="centered"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
 # -----------------------------------
-# Session ID
+# Session State
 # -----------------------------------
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
 
-# -----------------------------------
-# Chat History
-# -----------------------------------
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 # -----------------------------------
-# Styling
+# Custom CSS
 # -----------------------------------
 st.markdown("""
 <style>
 
-.stApp{
-    background: linear-gradient(135deg,#EEF6FF,#D9EFFF);
+/* Hide Streamlit Menu */
+#MainMenu{
+    visibility:hidden;
 }
 
-h1{
+footer{
+    visibility:hidden;
+}
+
+header{
+    visibility:hidden;
+}
+
+/* Background */
+.stApp{
+    background:linear-gradient(135deg,#EEF5FF,#DDEEFF);
+}
+
+/* Main Container */
+.block-container{
+    max-width:1000px;
+    padding-top:1.5rem;
+    padding-bottom:2rem;
+}
+
+/* Header Card */
+.header-card{
+    background:white;
+    border-radius:18px;
+    padding:25px;
     text-align:center;
-    color:#1E3A8A;
+    box-shadow:0px 4px 15px rgba(0,0,0,0.08);
+    margin-bottom:25px;
+}
+
+.header-title{
+    font-size:34px;
+    font-weight:bold;
+    color:#1D4ED8;
+}
+
+.header-subtitle{
+    font-size:17px;
+    color:#6B7280;
+    margin-top:8px;
+}
+
+/* Sidebar */
+section[data-testid="stSidebar"]{
+    background:#1E3A8A;
+}
+
+section[data-testid="stSidebar"] *{
+    color:white;
+}
+
+/* Buttons */
+.stButton>button{
+    width:100%;
+    border-radius:12px;
+    height:46px;
+    border:none;
+    background:#2563EB;
+    color:white;
+    font-weight:bold;
+}
+
+.stButton>button:hover{
+    background:#1D4ED8;
+}
+
+/* Chat Input */
+[data-testid="stChatInput"]{
+    position:sticky;
+    bottom:0;
+}
+
+/* Mobile */
+@media(max-width:768px){
+
+.block-container{
+    padding:15px;
+}
+
+.header-title{
+    font-size:26px;
+}
+
+.header-subtitle{
+    font-size:15px;
+}
+
 }
 
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown(
-    "<h1>🤖 Scaller Technologies AI Assistant</h1>",
-    unsafe_allow_html=True
-)
 # -----------------------------------
-# Clear Chat Button
+# Sidebar
 # -----------------------------------
-if st.button("🗑️ Clear Chat"):
+with st.sidebar:
 
-    try:
-        requests.delete(
-            "http://127.0.0.1:8000/clear-session",
-            json={
-                "session_id": st.session_state.session_id
-            }
-        )
-    except:
-        pass
+    st.title("🤖 Scaller AI")
 
-    st.session_state.messages = []
+    st.success("🟢 Online")
 
-    st.session_state.session_id = str(uuid.uuid4())
+    st.write("---")
 
-    st.rerun()
+    st.markdown("### Session")
+
+    st.caption("Active Conversation")
+
+    if st.button("🗑️ Clear Chat"):
+
+        try:
+            requests.delete(
+                f"{API_URL}/clear-session",
+                json={
+                    "session_id": st.session_state.session_id
+                }
+            )
+        except:
+            pass
+
+        st.session_state.messages = []
+        st.session_state.session_id = str(uuid.uuid4())
+
+        st.rerun()
+
+    st.write("---")
+
+    st.caption("Scaller Technologies AI Assistant")
+
 # -----------------------------------
-# Display Previous Messages
+# Header
+# -----------------------------------
+st.markdown("""
+<div class="header-card">
+
+<div class="header-title">
+🤖 Scaller AI Assistant
+</div>
+
+<div class="header-subtitle">
+Ask anything about Scaller Technologies
+</div>
+
+</div>
+""", unsafe_allow_html=True)
+# -----------------------------------
+# Display Chat History
 # -----------------------------------
 for message in st.session_state.messages:
 
-    with st.chat_message(message["role"]):
+    avatar = "👤" if message["role"] == "user" else "🤖"
+
+    with st.chat_message(message["role"], avatar=avatar):
         st.markdown(message["content"])
 
 
 # -----------------------------------
-# Chat Input
+# Input Area
 # -----------------------------------
-question = st.chat_input("Ask anything about Scaller Technologies...")
+col1, col2 = st.columns([6,1])
+
+with col1:
+
+    question = st.chat_input(
+        "Ask anything about Scaller Technologies..."
+    )
+
+with col2:
+
+    st.write("")
+
+    st.write("")
+
+    voice_text = speech_to_text(
+    language="en",
+    use_container_width=True,
+    just_once=True,
+    key="voice_input"
+)
+
+if voice_text:
+    question = voice_text
 
 
 # -----------------------------------
-# Send Question
+# Process Question
 # -----------------------------------
 if question:
 
-    # Show user message
+    # Show User Message
     st.session_state.messages.append(
         {
-            "role": "user",
-            "content": question
+            "role":"user",
+            "content":question
         }
     )
 
-    with st.chat_message("user"):
+    with st.chat_message("user", avatar="👤"):
+
         st.markdown(question)
 
-    # Get bot response
-    with st.spinner("Thinking..."):
+    # Assistant Thinking
+    with st.chat_message("assistant", avatar="🤖"):
+
+        thinking = st.empty()
+
+        thinking.markdown("⏳ **Thinking...**")
 
         try:
 
-            # Connect to WebSocket
             ws = websocket.create_connection(WS_URL)
 
-            # Send question
             ws.send(
                 json.dumps(
                     {
-                        "session_id": st.session_state.session_id,
-                        "question": question
+                        "session_id":st.session_state.session_id,
+                        "question":question
                     }
                 )
             )
 
-            # Receive response
-            response = json.loads(ws.recv())
+            response = json.loads(
+                ws.recv()
+            )
 
             ws.close()
 
@@ -135,15 +277,31 @@ if question:
 
         except Exception as e:
 
-            answer = f"Connection Error: {e}"
+            answer = f"❌ Connection Error\n\n{e}"
 
-    # Save bot response
+        thinking.empty()
+
+        st.markdown(answer)
+
+    # Save Assistant Response
     st.session_state.messages.append(
         {
-            "role": "assistant",
-            "content": answer
+            "role":"assistant",
+            "content":answer
         }
     )
 
-    with st.chat_message("assistant"):
-        st.markdown(answer)
+# -----------------------------------
+# Footer
+# -----------------------------------
+st.markdown("---")
+
+left,right = st.columns([1,1])
+
+with left:
+
+    st.caption("🟢 Connected")
+
+with right:
+
+    st.caption("Powered by FastAPI • Groq • WebSocket")
