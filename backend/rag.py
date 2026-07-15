@@ -21,6 +21,23 @@ document_vectors = vectorizer.fit_transform(documents)
 def search(question, history):
 
     # -----------------------------
+    # Normalize Question
+    # -----------------------------
+    question = question.lower()
+
+    if "team" in question:
+        question += " ceo cto hr manager project manager leadership"
+
+    if "staff" in question:
+        question += " team employees"
+
+    if "employee" in question or "employees" in question:
+        question += " team staff"
+
+    if "management" in question:
+        question += " ceo cto leadership"
+
+    # -----------------------------
     # Build Search Query
     # -----------------------------
     search_query = question
@@ -30,25 +47,20 @@ def search(question, history):
         previous_context = ""
 
         for chat in history:
-
             previous_context += chat["question"] + " "
             previous_context += chat["answer"] + " "
 
-        search_query = previous_context + question
+        search_query = previous_context + " " + question
 
     # -----------------------------
     # Retrieve Documents
     # -----------------------------
     question_vector = vectorizer.transform([search_query])
 
-    similarity = cosine_similarity(
-        question_vector,
-        document_vectors
-    )[0]
-        # -----------------------------
-    # Get Top 3 Matching Chunks
-    # -----------------------------
-    top_indices = similarity.argsort()[-3:][::-1]
+    similarity = cosine_similarity(question_vector, document_vectors)[0]
+
+    # Retrieve top 5 chunks
+    top_indices = similarity.argsort()[-5:][::-1]
 
     context = ""
 
@@ -56,7 +68,7 @@ def search(question, history):
         context += documents[index] + "\n\n"
 
     # -----------------------------
-    # Format Conversation History
+    # Conversation History
     # -----------------------------
     history_text = ""
 
@@ -72,12 +84,15 @@ You are an AI assistant for Scaller Technologies.
 
 Use the conversation history to understand follow-up questions.
 
-Answer ONLY using the company information provided below.
+Answer ONLY using the company information below.
 
-If the answer is not available in the company information,
-reply exactly:
+If the answer exists anywhere in the company information, answer it clearly.
+
+Only reply:
 
 I don't have that information.
+
+when the information is completely missing.
 
 Conversation History:
 {history_text}
@@ -89,9 +104,6 @@ Current Question:
 {question}
 """
 
-    # -----------------------------
-    # Generate Response
-    # -----------------------------
     response = client.chat.completions.create(
         model="llama-3.1-8b-instant",
         messages=[

@@ -2,6 +2,7 @@ import streamlit as st
 import websocket
 import uuid
 import json
+import requests
 
 # -----------------------------------
 # Backend URL
@@ -60,6 +61,16 @@ st.markdown(
 # Clear Chat Button
 # -----------------------------------
 if st.button("🗑️ Clear Chat"):
+
+    try:
+        requests.delete(
+            "http://127.0.0.1:8000/clear-session",
+            json={
+                "session_id": st.session_state.session_id
+            }
+        )
+    except:
+        pass
 
     st.session_state.messages = []
 

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from pydantic import BaseModel
 from collections import deque
 from rag import search
@@ -19,6 +19,9 @@ ws_memory = {}
 class Chat(BaseModel):
     session_id: str
     question: str
+
+class Session(BaseModel):
+    session_id: str
 
 
 # -----------------------------------
@@ -46,6 +49,22 @@ def chat(data: Chat):
 
     return {
         "answer": answer
+    }
+
+# -----------------------------------
+# Clear Session
+# -----------------------------------
+@app.delete("/clear-session")
+def clear_session(data: Session):
+
+    if data.session_id in ws_memory:
+        del ws_memory[data.session_id]
+
+    if data.session_id in chat_memory:
+        del chat_memory[data.session_id]
+
+    return {
+        "message": "Session cleared successfully."
     }
 # -----------------------------------
 # WebSocket Endpoint
