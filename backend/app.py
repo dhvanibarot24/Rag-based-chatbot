@@ -1,9 +1,28 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import (
+    FastAPI,
+    WebSocket,
+    WebSocketDisconnect,
+    HTTPException,
+    UploadFile,
+    File
+)
+
 from pydantic import BaseModel
 from collections import deque
 from rag import search
 
+from groq import Groq
+from dotenv import load_dotenv
+
+import tempfile
+import os
 app = FastAPI()
+
+load_dotenv()
+
+client = Groq(
+    api_key=os.getenv("GROQ_API_KEY")
+)
 
 # -----------------------------------
 # REST API Memory
@@ -52,20 +71,63 @@ def chat(data: Chat):
     }
 
 # -----------------------------------
-# Clear Session
+# Speech To Text
 # -----------------------------------
-@app.delete("/clear-session")
-def clear_session(data: Session):
 
-    if data.session_id in ws_memory:
-        del ws_memory[data.session_id]
+@app.post("/speech-to-text")
+async def speech_to_text(audio: UploadFile = File(...)):
 
-    if data.session_id in chat_memory:
-        del chat_memory[data.session_id]
+    temp_path = None
 
-    return {
-        "message": "Session cleared successfully."
-    }
+    try:
+
+        extension = os.path.splitext(audio.filename)[1]
+
+        if extension == "":
+            extension = ".webm"
+
+        with tempfile.NamedTemporaryFile(
+            delete=False,
+            suffix=extension
+        ) as temp:
+
+            contents = await audio.read()
+
+            temp.write(contents)
+
+            temp_path = temp.name
+
+        with open(temp_path, "rb") as file:
+
+            transcription = client.audio.transcriptions.create(
+
+                file=(audio.filename, file),
+
+                model="whisper-large-v3-turbo",
+
+                response_format="verbose_json",
+
+                language="en",
+
+                temperature=0
+
+            )
+
+        return {
+            "text": transcription.text
+        }
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+
+    finally:
+
+        if temp_path and os.path.exists(temp_path):
+            os.remove(temp_path)
 # -----------------------------------
 # WebSocket Endpoint
 # -----------------------------------

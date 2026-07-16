@@ -1,379 +1,420 @@
+import hashlib
+import json
+import os
+import uuid
+
+import requests
 import streamlit as st
 import websocket
-import uuid
-import json
-import requests
-from streamlit_mic_recorder import speech_to_text
+from requests import RequestException
+from streamlit_mic_recorder import mic_recorder
+from websocket import WebSocketException, WebSocketTimeoutException
+
 
 # ==========================================================
-# BACKEND CONFIG
+# Backend configuration
 # ==========================================================
 
-LOCAL = True
+DEFAULT_API_URL = "http://127.0.0.1:8000"
+API_URL = os.getenv("SCALLER_API_URL", DEFAULT_API_URL).rstrip("/")
+DEFAULT_WS_URL = (
+    API_URL.replace("https://", "wss://").replace("http://", "ws://") + "/ws"
+)
+WS_URL = os.getenv("SCALLER_WS_URL", DEFAULT_WS_URL)
 
-if LOCAL:
-    WS_URL = "ws://127.0.0.1:8000/ws"
-    API_URL = "http://127.0.0.1:8000"
-else:
-    WS_URL = "wss://scaller-bot.onrender.com/ws"
-    API_URL = "https://scaller-bot.onrender.com"
 
 # ==========================================================
-# PAGE CONFIG
+# Page configuration
 # ==========================================================
 
 st.set_page_config(
     page_title="Scaller AI Assistant",
     page_icon="🤖",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
+
 # ==========================================================
-# SESSION STATE
+# Session state
 # ==========================================================
 
-if "session_id" not in st.session_state:
+DEFAULT_STATE = {
+    "session_id": str(uuid.uuid4()),
+    "messages": [],
+    "message_text": "",
+    "last_audio_hash": "",
+    "submit_message": False,
+    "notice": "",
+}
+
+for key, value in DEFAULT_STATE.items():
+    if key not in st.session_state:
+        st.session_state[key] = value
+
+
+# ==========================================================
+# Helper functions
+# ==========================================================
+
+def show_notice() -> None:
+    """Display one friendly notice from the previous action."""
+    if not st.session_state.notice:
+        return
+
+    level, message = st.session_state.notice.split(":", 1)
+    if level == "error":
+        st.error(message)
+    elif level == "warning":
+        st.warning(message)
+    else:
+        st.info(message)
+
+    st.session_state.notice = ""
+
+
+def set_notice(level: str, message: str) -> None:
+    st.session_state.notice = f"{level}:{message}"
+
+
+def request_submit() -> None:
+    """Called when Enter is pressed inside the single textbox."""
+    st.session_state.submit_message = True
+
+
+def reset_chat_state() -> None:
+    st.session_state.messages = []
+    st.session_state.message_text = ""
+    st.session_state.last_audio_hash = ""
+    st.session_state.submit_message = False
     st.session_state.session_id = str(uuid.uuid4())
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
 
-if "chat_input" not in st.session_state:
-    st.session_state.chat_input = ""
+def clear_chat() -> None:
+    """Clear backend and frontend chat memory."""
+    try:
+        response = requests.delete(
+            f"{API_URL}/clear-session",
+            json={"session_id": st.session_state.session_id},
+            timeout=8,
+        )
+        if response.status_code >= 400:
+            set_notice(
+                "warning",
+                "Chat was cleared here, but the backend did not confirm the session reset.",
+            )
+    except RequestException:
+        set_notice(
+            "warning",
+            "Chat was cleared here. The backend could not be reached for session reset.",
+        )
 
-# ✅ Fixed missing session state
-if "voice_text" not in st.session_state:
-    st.session_state.voice_text = ""
+    reset_chat_state()
 
-# ==========================================================
-# CUSTOM CSS
-# ==========================================================
 
-st.markdown("""
-<style>
+def send_question(question: str) -> str:
+    """Send one chat turn through the existing WebSocket endpoint."""
+    ws = None
 
-/* Hide Streamlit UI */
+    try:
+        ws = websocket.create_connection(WS_URL, timeout=25)
+        ws.send(
+            json.dumps(
+                {
+                    "session_id": st.session_state.session_id,
+                    "question": question,
+                }
+            )
+        )
+        response = json.loads(ws.recv())
+        answer = response.get("answer", "").strip()
+        return answer or "I do not have an answer for that yet."
 
-#MainMenu{
-    visibility:hidden;
-}
+    except WebSocketTimeoutException:
+        return "The server took too long to answer. Please try again in a moment."
+    except (ConnectionRefusedError, WebSocketException, OSError):
+        return "I could not connect to the backend right now. Please make sure the FastAPI server is running."
+    except json.JSONDecodeError:
+        return "The backend returned an unexpected response. Please try again."
+    finally:
+        if ws is not None:
+            try:
+                ws.close()
+            except WebSocketException:
+                pass
 
-header{
-    visibility:hidden;
-}
 
-footer{
-    visibility:hidden;
-}
+def audio_mime_type(audio_format: str) -> str:
+    clean_format = (audio_format or "webm").lower().lstrip(".")
+    if clean_format == "wav":
+        return "audio/wav"
+    if clean_format == "mp3":
+        return "audio/mpeg"
+    return "audio/webm"
 
-/* Background */
 
-.stApp{
-    background:linear-gradient(135deg,#EEF5FF,#DCEEFF);
-}
+def transcribe_audio(audio: dict) -> None:
+    """Upload a new recording to the existing speech endpoint."""
+    audio_bytes = audio.get("bytes") if audio else None
 
-/* Main Width */
+    if not audio_bytes:
+        set_notice("warning", "I did not receive any audio. Please record again.")
+        return
 
-.block-container{
-    max-width:950px;
-    padding-top:20px;
-    padding-bottom:20px;
-}
+    audio_hash = hashlib.sha256(audio_bytes).hexdigest()
+    if audio_hash == st.session_state.last_audio_hash:
+        return
 
-/* Sidebar */
+    st.session_state.last_audio_hash = audio_hash
+    audio_format = audio.get("format", "webm")
+    filename = f"voice.{audio_format}"
 
-section[data-testid="stSidebar"]{
-    background:#1E3A8A;
-}
+    try:
+        response = requests.post(
+            f"{API_URL}/speech-to-text",
+            files={
+                "audio": (
+                    filename,
+                    audio_bytes,
+                    audio_mime_type(audio_format),
+                )
+            },
+            timeout=45,
+        )
+        response.raise_for_status()
+        text = response.json().get("text", "").strip()
 
-section[data-testid="stSidebar"] *{
-    color:white;
-}
+        if not text:
+            set_notice("warning", "I could not hear any words in that recording.")
+            return
 
-/* Header */
+        st.session_state.message_text = text
+        set_notice("info", "Voice transcription is ready. You can edit it before sending.")
+        st.rerun()
 
-.header{
-    background:white;
-    padding:25px;
-    border-radius:18px;
-    box-shadow:0px 5px 18px rgba(0,0,0,.08);
-    margin-bottom:25px;
-    text-align:center;
-}
+    except requests.Timeout:
+        set_notice("error", "Speech recognition timed out. Please try a shorter recording.")
+    except RequestException:
+        set_notice("error", "Speech recognition failed because the backend could not be reached.")
+    except (ValueError, KeyError):
+        set_notice("error", "Speech recognition returned an unexpected response.")
 
-.header h1{
-    color:#2563EB;
-    margin-bottom:8px;
-}
 
-.header p{
-    color:#6B7280;
-    font-size:17px;
-}
+def submit_current_message() -> None:
+    """Send the current textbox value and clear it after the reply."""
+    st.session_state.submit_message = False
+    question = st.session_state.message_text.strip()
 
-/* Chat */
+    if not question:
+        set_notice("warning", "Please enter a question before sending.")
+        return
 
-[data-testid="stChatMessage"]{
-    background:white;
-    border-radius:18px;
-    padding:12px;
-    margin-bottom:10px;
-    box-shadow:0px 2px 8px rgba(0,0,0,.05);
-}
+    st.session_state.messages.append({"role": "user", "content": question})
+    st.session_state.message_text = ""
+    st.session_state.last_audio_hash = ""
 
-/* Textbox */
+    with st.spinner("Scaller AI is thinking..."):
+        answer = send_question(question)
 
-.stTextInput input{
-    height:56px;
-    border-radius:16px;
-    border:2px solid #D9E2F2 !important;
-    background:#F9FBFF;
-    font-size:16px;
-    padding-left:18px;
-    transition:all .25s;
-}
+    st.session_state.messages.append({"role": "assistant", "content": answer})
+    st.rerun()
 
-.stTextInput input:focus{
-    border:2px solid #2563EB !important;
-    background:white;
-    box-shadow:0px 0px 12px rgba(37,99,235,.18);
-}
-
-/* Buttons */
-
-.stButton button{
-    height:56px;
-    border-radius:16px;
-    background:#2563EB;
-    color:white;
-    font-size:22px;
-    font-weight:700;
-    border:none;
-    transition:.25s;
-}
-
-.stButton button:hover{
-    background:#1D4ED8;
-    transform:translateY(-2px);
-}
-
-/* Mobile */
-
-@media(max-width:768px){
-
-.block-container{
-padding-left:15px;
-padding-right:15px;
-}
-
-.header h1{
-font-size:28px;
-}
-
-.header p{
-font-size:15px;
-}
-
-}
-
-</style>
-""", unsafe_allow_html=True)
 
 # ==========================================================
-# SIDEBAR
+# Styling
+# ==========================================================
+
+st.markdown(
+    """
+    <style>
+    #MainMenu,
+    header,
+    footer {
+        visibility: hidden;
+    }
+
+    .stApp {
+        background: #eef5ff;
+    }
+
+    .block-container {
+        max-width: 980px;
+        padding: 1.5rem 1rem 2rem;
+    }
+
+    section[data-testid="stSidebar"] {
+        background: #123c7c;
+    }
+
+    section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"],
+    section[data-testid="stSidebar"] h1,
+    section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3,
+    section[data-testid="stSidebar"] p,
+    section[data-testid="stSidebar"] span {
+        color: #ffffff;
+    }
+
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        background: #ffffff;
+        border: 1px solid #dbeafe;
+        border-radius: 18px;
+        box-shadow: 0 10px 28px rgba(37, 99, 235, 0.08);
+    }
+
+    [data-testid="stChatMessage"] {
+        background: #ffffff;
+        border: 1px solid #dbeafe;
+        border-radius: 18px;
+        box-shadow: 0 6px 18px rgba(37, 99, 235, 0.06);
+        margin-bottom: 0.75rem;
+    }
+
+    [data-testid="stChatMessageContent"] {
+        color: #0f172a;
+    }
+
+    .stTextInput input {
+        min-height: 54px;
+        border: 1px solid #bfdbfe;
+        border-radius: 14px;
+        background: #f8fbff;
+        color: #0f172a;
+        font-size: 1rem;
+        padding: 0 1rem;
+    }
+
+    .stTextInput input:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+    }
+
+    .stButton > button,
+    .stFormSubmitButton > button {
+        min-height: 48px;
+        border: 0;
+        border-radius: 14px;
+        background: #2563eb;
+        color: #ffffff;
+        font-weight: 700;
+    }
+
+    .stButton > button:hover,
+    .stFormSubmitButton > button:hover {
+        background: #1d4ed8;
+        color: #ffffff;
+    }
+
+    iframe {
+        border-radius: 14px;
+    }
+
+    @media (max-width: 768px) {
+        .block-container {
+            padding-left: 0.75rem;
+            padding-right: 0.75rem;
+        }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+# ==========================================================
+# Sidebar
 # ==========================================================
 
 with st.sidebar:
+    st.title("Scaller AI")
+    st.success("Online")
+    st.divider()
+    st.subheader("Current Session")
+    st.caption(st.session_state.session_id[:8])
 
-    st.title("🤖 Scaller AI")
-
-    st.success("🟢 Online")
-
-    st.write("")
-
-    st.markdown("### Session")
-
-    st.caption("Conversation Active")
-
-    if st.button("🗑️ Clear Chat"):
-
-        try:
-            requests.delete(
-                f"{API_URL}/clear-session",
-                json={
-                    "session_id": st.session_state.session_id
-                }
-            )
-
-        except Exception:
-            pass
-
-        st.session_state.messages = []
-        st.session_state.chat_input = ""
-        st.session_state.voice_text = ""
-        st.session_state.session_id = str(uuid.uuid4())
-
+    if st.button("Clear Chat", use_container_width=True, type="primary"):
+        clear_chat()
         st.rerun()
-# ==========================================================
-# HEADER
-# ==========================================================
 
-st.markdown("""
-<div class="header">
-    <h1>🤖 Scaller AI Assistant</h1>
-    <p>
-        Ask anything about Scaller Technologies using text or voice.
-    </p>
-</div>
-""", unsafe_allow_html=True)
 
 # ==========================================================
-# CHAT HISTORY
+# Header
 # ==========================================================
+
+with st.container(border=True):
+    st.title("🤖 Scaller AI Assistant")
+    st.caption("Ask anything about Scaller Technologies using text or voice.")
+
+show_notice()
+
+
+# ==========================================================
+# Chat history
+# ==========================================================
+
+st.subheader("Chat History")
+
+if not st.session_state.messages:
+    with st.chat_message("assistant", avatar="🤖"):
+        st.markdown("Hi, I am ready to help with Scaller Technologies.")
 
 for message in st.session_state.messages:
-
     avatar = "👤" if message["role"] == "user" else "🤖"
-
     with st.chat_message(message["role"], avatar=avatar):
         st.markdown(message["content"])
 
 
 # ==========================================================
-# VOICE INPUT
+# Input area
 # ==========================================================
 
-st.markdown("""
-<div style="
-font-size:15px;
-font-weight:600;
-color:#2563EB;
-margin-bottom:8px;
-">
-🎤 Voice Input
-</div>
-""", unsafe_allow_html=True)
+with st.container(border=True):
+    st.subheader("💬 Ask your question")
 
-voice = speech_to_text(
-    language="en",
-    start_prompt="Start Speaking",
-    stop_prompt="⏹ Stop Recording",
-    just_once=True,
-    use_container_width=False,
-    key="voice"
-)
+    input_placeholder = st.empty()
+    controls_container = st.container()
 
-if voice:
-    st.session_state.voice_text = voice
+    with controls_container:
+        voice_col, send_col = st.columns(2, gap="small")
 
-# ==========================================================
-# CHAT FORM
-# ==========================================================
+        with voice_col:
+            audio_result = mic_recorder(
+                start_prompt="🎤 Voice",
+                stop_prompt="Stop",
+                just_once=True,
+                use_container_width=True,
+                format="webm",
+                key="voice_recorder",
+            )
 
-st.subheader("💬 Ask your question")
+        with send_col:
+            send_clicked = st.button(
+                "➤ Send",
+                use_container_width=True,
+                type="primary",
+            )
 
-with st.form("chat_form", clear_on_submit=True):
+    if audio_result:
+        transcribe_audio(audio_result)
 
-    col1, col2 = st.columns([9, 1])
+    if send_clicked or st.session_state.submit_message:
+        submit_current_message()
 
-    with col1:
+    show_notice()
 
-        question = st.text_input(
-            "",
-            value=st.session_state.get("voice_text", ""),
+    with input_placeholder:
+        st.text_input(
+            "Question",
+            key="message_text",
             placeholder="Ask anything about Scaller Technologies...",
-            label_visibility="collapsed"
+            label_visibility="collapsed",
+            on_change=request_submit,
         )
 
-    with col2:
 
-        send = st.form_submit_button("➤", use_container_width=True)
-
-    if send:
-
-        question = question.strip()
-
-        if not question:
-
-            st.warning("Please enter a question.")
-
-        else:
-
-            st.session_state.messages.append(
-                {
-                    "role": "user",
-                    "content": question
-                }
-            )
-
-            ws = None
-
-            try:
-
-                with st.spinner("🤖 Thinking..."):
-
-                    ws = websocket.create_connection(WS_URL)
-
-                    ws.send(
-                        json.dumps(
-                            {
-                                "session_id": st.session_state.session_id,
-                                "question": question
-                            }
-                        )
-                    )
-
-                    response = json.loads(ws.recv())
-
-                    answer = response.get(
-                        "answer",
-                        "I don't have an answer."
-                    )
-
-            except Exception as e:
-
-                answer = (
-                    "⚠️ Unable to connect to the server.\n\n"
-                    "Please make sure the FastAPI backend is running.\n\n"
-                    f"Error: {e}"
-                )
-
-            finally:
-
-                if ws:
-                    ws.close()
-
-            st.session_state.messages.append(
-                {
-                    "role": "assistant",
-                    "content": answer
-                }
-            )
-
-            st.session_state.voice_text = ""
-
-            st.rerun()
 # ==========================================================
-# FOOTER
+# Footer
 # ==========================================================
 
-st.markdown("---")
-
-st.markdown(
-    """
-    <div style="
-        text-align:center;
-        color:#6B7280;
-        font-size:14px;
-        padding-bottom:15px;
-    ">
-
-    🤖 <b>Scaller AI Assistant</b><br>
-
-    Powered by FastAPI • Streamlit • WebSocket
-
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+st.divider()
+st.caption("Powered by FastAPI • Groq Whisper • Streamlit • WebSocket")
