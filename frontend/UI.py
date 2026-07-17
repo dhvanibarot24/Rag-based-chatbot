@@ -15,7 +15,7 @@ from websocket import WebSocketException, WebSocketTimeoutException
 # Backend configuration
 # ==========================================================
 
-DEFAULT_API_URL = "http://127.0.0.1:8000"
+DEFAULT_API_URL = "https://scaller-bot.onrender.com"
 API_URL = os.getenv("SCALLER_API_URL", DEFAULT_API_URL).rstrip("/")
 DEFAULT_WS_URL = (
     API_URL.replace("https://", "wss://").replace("http://", "ws://") + "/ws"
