@@ -1,20 +1,19 @@
-from groq import Groq
+import os
+
 from dotenv import load_dotenv
+from groq import Groq
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-import os
 
 load_dotenv()
 
-
-
-print("API Key:", os.getenv("GROQ_API_KEY"))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Groq Client
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 # Load Company Data
-with open("data.txt", "r", encoding="utf-8") as file:
+with open(os.path.join(BASE_DIR, "data.txt"), "r", encoding="utf-8") as file:
     documents = file.read().split("--------------------------------")
 
 # Create TF-IDF Vector Database
@@ -113,9 +112,9 @@ Current Question:
         messages=[
             {
                 "role": "user",
-                "content": prompt
+                "content": prompt,
             }
-        ]
+        ],
     )
 
     return response.choices[0].message.content
