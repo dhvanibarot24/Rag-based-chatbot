@@ -22,6 +22,7 @@ document_vectors = vectorizer.fit_transform(documents)
 
 
 def search(question, history):
+    original_question = question
 
     # -----------------------------
     # Normalize Question
@@ -83,19 +84,19 @@ def search(question, history):
     # Prompt
     # -----------------------------
     prompt = f"""
-You are an AI assistant for Scaller Technologies.
+You are a precise AI assistant for Scaller Technologies.
 
-Use the conversation history to understand follow-up questions.
+Use the conversation history only to understand follow-up questions.
 
-Answer ONLY using the company information below.
+Answer using only the company information below.
 
-If the answer exists anywhere in the company information, answer it clearly.
-
-Only reply:
-
-I don't have that information.
-
-when the information is completely missing.
+Rules:
+- Give the direct answer first.
+- Do not mention "database", "provided information", "company information", "context", or "data".
+- Do not explain retrieval or limitations unless the answer is missing.
+- Do not invent facts, names, dates, numbers, or services.
+- If the user asks about the team, list the known team members and their roles clearly.
+- If the answer is completely missing, reply exactly: I don't have that information.
 
 Conversation History:
 {history_text}
@@ -104,7 +105,7 @@ Company Information:
 {context}
 
 Current Question:
-{question}
+{original_question}
 """
 
     response = client.chat.completions.create(
@@ -115,6 +116,7 @@ Current Question:
                 "content": prompt,
             }
         ],
+        temperature=0,
     )
 
     return response.choices[0].message.content
