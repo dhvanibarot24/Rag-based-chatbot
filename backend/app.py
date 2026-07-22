@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import json
 import os
+import secrets
 import tempfile
 import time
 from typing import Optional
@@ -24,13 +25,18 @@ from pydantic import BaseModel
 from database import (
     authenticate_user,
     create_chat_session,
+    create_document,
     create_user,
+    delete_document,
     delete_messages,
+    document_hash_exists,
     ensure_chat_session,
+    get_document,
     get_messages,
     get_user_by_id,
     init_db,
     list_chat_sessions,
+    list_documents,
     recent_chat_pairs,
     save_message,
     user_owns_session,
@@ -46,6 +52,19 @@ init_db()
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 AUTH_SECRET = os.getenv("AUTH_SECRET_KEY") or os.getenv("GROQ_API_KEY") or os.urandom(32).hex()
 TOKEN_MAX_AGE_SECONDS = 60 * 60 * 24 * 7
+
+# -----------------------------------
+# Document Upload Configuration
+# -----------------------------------
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_BASE_DIR = os.getenv("UPLOAD_DIR", os.path.join(BASE_DIR, "uploads"))
+MAX_UPLOAD_SIZE_MB = int(os.getenv("MAX_UPLOAD_SIZE_MB", "10"))
+MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024
+UPLOAD_CHUNK_SIZE = 1024 * 1024
+
+ALLOWED_DOCUMENT_EXTENSIONS = {".pdf", ".docx", ".txt"}
+
+os.makedirs(UPLOAD_BASE_DIR, exist_ok=True)
 
 # -----------------------------------
 # REST API Memory
@@ -243,6 +262,124 @@ def session_messages(session_id: str, authorization: Optional[str] = Header(defa
         raise HTTPException(status_code=404, detail="Chat session was not found.")
 
     return {"messages": get_messages(session_id)}
+
+
+# -----------------------------------
+# Document Upload Endpoints
+# -----------------------------------
+def user_upload_dir(user_id: int) -> str:
+    user_dir = os.path.join(UPLOAD_BASE_DIR, str(user_id))
+    os.makedirs(user_dir, exist_ok=True)
+    return user_dir
+
+
+@app.post("/documents")
+async def upload_document(
+    file: UploadFile = File(...),
+    authorization: Optional[str] = Header(default=None),
+):
+    token = token_from_header(authorization)
+    user = require_authenticated_user(token)
+
+    original_filename = os.path.basename((file.filename or "").strip())
+    if not original_filename:
+        raise HTTPException(status_code=400, detail="Please choose a file to upload.")
+
+    extension = os.path.splitext(original_filename)[1].lower()
+    if extension not in ALLOWED_DOCUMENT_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported file type. Please upload a PDF, DOCX, or TXT file.",
+        )
+
+    contents = bytearray()
+    try:
+        while True:
+            chunk = await file.read(UPLOAD_CHUNK_SIZE)
+            if not chunk:
+                break
+            contents.extend(chunk)
+            if len(contents) > MAX_UPLOAD_SIZE_BYTES:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"File is too large. Maximum allowed size is {MAX_UPLOAD_SIZE_MB} MB.",
+                )
+    finally:
+        await file.close()
+
+    if not contents:
+        raise HTTPException(status_code=400, detail="The uploaded file is empty.")
+
+    file_hash = hashlib.sha256(contents).hexdigest()
+    user_id = int(user["id"])
+
+    if document_hash_exists(user_id, file_hash):
+        raise HTTPException(
+            status_code=409,
+            detail="You have already uploaded this document.",
+        )
+
+    stored_filename = f"{secrets.token_hex(16)}{extension}"
+    stored_path = os.path.join(user_upload_dir(user_id), stored_filename)
+
+    try:
+        with open(stored_path, "wb") as out_file:
+            out_file.write(contents)
+    except OSError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="The document could not be saved. Please try again.",
+        ) from exc
+
+    try:
+        document = create_document(
+            user_id=user_id,
+            original_filename=original_filename,
+            stored_filename=stored_filename,
+            file_type=extension.lstrip("."),
+            file_size=len(contents),
+            file_hash=file_hash,
+        )
+    except Exception as exc:
+        if os.path.exists(stored_path):
+            os.remove(stored_path)
+        raise HTTPException(
+            status_code=500,
+            detail="The document could not be saved. Please try again.",
+        ) from exc
+
+    return {"document": document}
+
+
+@app.get("/documents")
+def documents(authorization: Optional[str] = Header(default=None)):
+    token = token_from_header(authorization)
+    user = require_authenticated_user(token)
+    return {"documents": list_documents(int(user["id"]))}
+
+
+@app.delete("/documents/{document_id}")
+def remove_document(document_id: int, authorization: Optional[str] = Header(default=None)):
+    token = token_from_header(authorization)
+    user = require_authenticated_user(token)
+
+    document = get_document(document_id)
+    if document is None or int(document["user_id"]) != int(user["id"]):
+        raise HTTPException(status_code=404, detail="Document was not found.")
+
+    stored_path = os.path.join(
+        UPLOAD_BASE_DIR, str(user["id"]), document["stored_filename"]
+    )
+
+    delete_document(document_id)
+
+    if os.path.exists(stored_path):
+        try:
+            os.remove(stored_path)
+        except OSError:
+            pass
+
+    return {"status": "deleted"}
 
 
 # -----------------------------------

@@ -49,6 +49,8 @@ DEFAULT_STATE = {
     "user": None,
     "auth_page": "login",
     "chat_sessions": [],
+    "documents": [],
+    "last_uploaded_key": "",
 }
 
 for key, value in DEFAULT_STATE.items():
@@ -109,6 +111,7 @@ def set_logged_in(payload: dict) -> None:
     st.session_state.messages = []
     reset_chat_inputs()
     load_sessions()
+    load_documents()
 
 
 def logout() -> None:
@@ -117,6 +120,8 @@ def logout() -> None:
     st.session_state.session_id = ""
     st.session_state.messages = []
     st.session_state.chat_sessions = []
+    st.session_state.documents = []
+    st.session_state.last_uploaded_key = ""
     st.session_state.auth_page = "login"
     reset_chat_inputs()
     set_notice("info", "You have been logged out.")
@@ -242,6 +247,70 @@ def send_question(question: str) -> str:
                 ws.close()
             except WebSocketException:
                 pass
+
+
+def load_documents() -> None:
+    if not st.session_state.auth_token:
+        st.session_state.documents = []
+        return
+
+    try:
+        response = requests.get(f"{API_URL}/documents", headers=auth_headers(), timeout=8)
+        response.raise_for_status()
+        st.session_state.documents = response.json().get("documents", [])
+    except RequestException:
+        set_notice("warning", "Your documents could not be loaded right now.")
+    except ValueError:
+        set_notice("warning", "Documents returned an unexpected response.")
+
+
+def upload_document(uploaded_file) -> None:
+    """Upload a document through the existing FastAPI endpoint."""
+    if uploaded_file is None:
+        return
+
+    try:
+        response = requests.post(
+            f"{API_URL}/documents",
+            headers=auth_headers(),
+            files={
+                "file": (
+                    uploaded_file.name,
+                    uploaded_file.getvalue(),
+                    uploaded_file.type or "application/octet-stream",
+                )
+            },
+            timeout=30,
+        )
+        if response.status_code >= 400:
+            set_notice("error", friendly_error(response, "Document upload failed."))
+            return
+
+        set_notice("success", "Document uploaded successfully.")
+        load_documents()
+    except RequestException:
+        set_notice("error", "Document upload failed because the backend could not be reached.")
+    except (ValueError, KeyError):
+        set_notice("error", "Document upload returned an unexpected response.")
+
+
+def delete_document(document_id: int) -> None:
+    try:
+        response = requests.delete(
+            f"{API_URL}/documents/{document_id}",
+            headers=auth_headers(),
+            timeout=8,
+        )
+        if response.status_code >= 400:
+            set_notice("error", friendly_error(response, "The document could not be deleted."))
+        else:
+            set_notice("success", "Document deleted.")
+    except RequestException:
+        set_notice("error", "Deletion failed because the backend could not be reached.")
+    except (ValueError, KeyError):
+        set_notice("error", "Deletion returned an unexpected response.")
+    finally:
+        load_documents()
 
 
 def audio_mime_type(audio_format: str) -> str:
@@ -572,6 +641,43 @@ def render_sidebar() -> None:
                 ):
                     load_messages(session_id)
                     st.rerun()
+
+        st.divider()
+        st.subheader("📁 My Documents")
+
+        uploaded_file = st.file_uploader(
+            "Upload a document",
+            type=["pdf", "docx", "txt"],
+            key="document_uploader",
+            label_visibility="collapsed",
+            help="PDF, DOCX, or TXT files only.",
+        )
+
+        if uploaded_file is not None:
+            upload_key = f"{uploaded_file.name}:{uploaded_file.size}"
+            if st.session_state.last_uploaded_key != upload_key:
+                st.session_state.last_uploaded_key = upload_key
+                upload_document(uploaded_file)
+                st.rerun()
+
+        if not st.session_state.documents:
+            st.caption("No documents uploaded yet.")
+        else:
+            for document in st.session_state.documents:
+                doc_id = document["document_id"]
+                with st.container(border=True):
+                    st.markdown(f"**{document['original_filename']}**")
+                    st.caption(
+                        f"{document['file_type'].upper()} • "
+                        f"{document['uploaded_at'][:10]}"
+                    )
+                    if st.button(
+                        "🗑️ Delete",
+                        key=f"delete_doc_{doc_id}",
+                        use_container_width=True,
+                    ):
+                        delete_document(doc_id)
+                        st.rerun()
 
 
 def render_chat() -> None:

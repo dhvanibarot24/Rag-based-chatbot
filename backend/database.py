@@ -61,10 +61,31 @@ def init_db() -> None:
             """
         )
         connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS documents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                original_filename TEXT NOT NULL,
+                stored_filename TEXT NOT NULL,
+                file_type TEXT NOT NULL,
+                file_size INTEGER NOT NULL,
+                file_hash TEXT NOT NULL,
+                uploaded_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+            """
+        )
+        connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_chat_sessions_user_id ON chat_sessions(user_id)"
         )
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_messages_session_id ON messages(session_id)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_documents_user_id ON documents(user_id)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_documents_user_hash ON documents(user_id, file_hash)"
         )
 
 
@@ -236,6 +257,101 @@ def get_messages(session_id: str) -> List[Dict[str, object]]:
 def delete_messages(session_id: str) -> None:
     with get_connection() as connection:
         connection.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
+
+
+def public_document(row: sqlite3.Row) -> Dict[str, object]:
+    return {
+        "document_id": row["id"],
+        "original_filename": row["original_filename"],
+        "file_type": row["file_type"],
+        "file_size": row["file_size"],
+        "uploaded_at": row["uploaded_at"],
+    }
+
+
+def create_document(
+    user_id: int,
+    original_filename: str,
+    stored_filename: str,
+    file_type: str,
+    file_size: int,
+    file_hash: str,
+) -> Dict[str, object]:
+    uploaded_at = utc_now()
+
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """
+            INSERT INTO documents (
+                user_id, original_filename, stored_filename,
+                file_type, file_size, file_hash, uploaded_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                original_filename,
+                stored_filename,
+                file_type,
+                file_size,
+                file_hash,
+                uploaded_at,
+            ),
+        )
+        row = connection.execute(
+            """
+            SELECT id, original_filename, file_type, file_size, uploaded_at
+            FROM documents WHERE id = ?
+            """,
+            (cursor.lastrowid,),
+        ).fetchone()
+
+    return public_document(row)
+
+
+def document_hash_exists(user_id: int, file_hash: str) -> bool:
+    with get_connection() as connection:
+        row = connection.execute(
+            "SELECT 1 FROM documents WHERE user_id = ? AND file_hash = ?",
+            (user_id, file_hash),
+        ).fetchone()
+    return row is not None
+
+
+def list_documents(user_id: int) -> List[Dict[str, object]]:
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT id, original_filename, file_type, file_size, uploaded_at
+            FROM documents
+            WHERE user_id = ?
+            ORDER BY id DESC
+            """,
+            (user_id,),
+        ).fetchall()
+
+    return [public_document(row) for row in rows]
+
+
+def get_document(document_id: int) -> Optional[Dict[str, object]]:
+    """Return the full internal record (including owner and stored filename)."""
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT id, user_id, original_filename, stored_filename,
+                   file_type, file_size, uploaded_at
+            FROM documents
+            WHERE id = ?
+            """,
+            (document_id,),
+        ).fetchone()
+
+    return dict(row) if row else None
+
+
+def delete_document(document_id: int) -> None:
+    with get_connection() as connection:
+        connection.execute("DELETE FROM documents WHERE id = ?", (document_id,))
 
 
 def recent_chat_pairs(session_id: str, limit: int = 4) -> List[Dict[str, str]]:
