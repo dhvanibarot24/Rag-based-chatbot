@@ -409,7 +409,11 @@ st.markdown(
     }
 
     .block-container {
-        padding: 1.5rem 1rem 2rem;
+        padding: 1rem 1rem 1.5rem;
+    }
+
+    div[data-testid="stVerticalBlock"] {
+        gap: 0.6rem;
     }
 
     section[data-testid="stSidebar"] {
@@ -437,7 +441,8 @@ st.markdown(
         border: 1px solid #dbeafe;
         border-radius: 18px;
         box-shadow: 0 6px 18px rgba(37, 99, 235, 0.06);
-        margin-bottom: 0.75rem;
+        margin-bottom: 0.5rem;
+        padding: 0.6rem 1rem;
     }
 
     [data-testid="stChatMessageContent"] {
@@ -477,6 +482,11 @@ st.markdown(
 
     iframe {
         border-radius: 14px;
+        min-height: 48px;
+    }
+
+    div[data-testid="stHorizontalBlock"] {
+        align-items: center;
     }
 
     @media (max-width: 768px) {
@@ -489,15 +499,23 @@ st.markdown(
     .document-card{
     background:#ffffff;
     border:1px solid #dbeafe;
-    border-radius:12px;
-    padding:8px 12px;
-    margin-bottom:6px;
+    border-radius:10px;
+    padding:5px 10px;
+    margin-bottom:4px;
         }
 
     .document-name{
-    font-size:15px;
+    font-size:14px;
     font-weight:600;
     color:#1f2937;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    }
+
+    div[data-testid="column"] button[kind="secondary"] {
+        min-height: 34px;
+        padding: 0 0.5rem;
     }
     </style>
     """,

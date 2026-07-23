@@ -42,7 +42,10 @@ from database import (
     user_owns_session,
     validate_email,
 )
+from document_loader import chunk_text, extract_text
+from embedding import embed_texts
 from rag import search
+from vector_store import add_document_chunks, delete_document_chunks
 
 load_dotenv()
 
@@ -316,7 +319,7 @@ async def upload_document(
     if document_hash_exists(user_id, file_hash):
         raise HTTPException(
             status_code=409,
-            detail="You have already uploaded this document.",
+            detail="This document has already been uploaded.",
         )
 
     stored_filename = f"{secrets.token_hex(16)}{extension}"
@@ -348,6 +351,34 @@ async def upload_document(
             detail="The document could not be saved. Please try again.",
         ) from exc
 
+    # -----------------------------------
+    # RAG Processing: extract -> chunk -> embed -> store in ChromaDB
+    # Runs once per upload; embeddings are never regenerated on query.
+    # -----------------------------------
+    try:
+        document_text = extract_text(stored_path, extension)
+        chunks = chunk_text(document_text)
+        if not chunks:
+            raise ValueError("No readable text could be found in this document.")
+
+        chunk_embeddings = embed_texts(chunks)
+        add_document_chunks(
+            user_id=user_id,
+            document_id=document["document_id"],
+            original_filename=original_filename,
+            chunks=chunks,
+            embeddings=chunk_embeddings,
+        )
+    except Exception as exc:
+        # Roll back so we never leave an unsearchable "ghost" document behind.
+        delete_document(document["document_id"])
+        if os.path.exists(stored_path):
+            os.remove(stored_path)
+        raise HTTPException(
+            status_code=500,
+            detail=f"The document was saved but could not be processed for search: {exc}",
+        ) from exc
+
     return {"document": document}
 
 
@@ -372,6 +403,7 @@ def remove_document(document_id: int, authorization: Optional[str] = Header(defa
     )
 
     delete_document(document_id)
+    delete_document_chunks(document_id)  # no orphan embeddings left behind
 
     if os.path.exists(stored_path):
         try:
@@ -388,21 +420,17 @@ def remove_document(document_id: int, authorization: Optional[str] = Header(defa
 @app.post("/chat")
 def chat(data: Chat, authorization: Optional[str] = Header(default=None)):
     token = token_from_header(authorization)
-    user = get_authenticated_user(token)
+    user = require_authenticated_user(token)
 
-    if token and user is None:
-        raise HTTPException(status_code=401, detail="Please log in again.")
-
-    if user is not None:
-        if not user_owns_session(int(user["id"]), data.session_id):
-            raise HTTPException(status_code=403, detail="You do not have access to this chat session.")
-        load_memory_from_database(chat_memory, data.session_id)
+    if not user_owns_session(int(user["id"]), data.session_id):
+        raise HTTPException(status_code=403, detail="You do not have access to this chat session.")
+    load_memory_from_database(chat_memory, data.session_id)
 
     if data.session_id not in chat_memory:
         chat_memory[data.session_id] = deque(maxlen=4)
 
     history = list(chat_memory[data.session_id])
-    answer = search(data.question, history)
+    answer = search(data.question, history, int(user["id"]))
 
     chat_memory[data.session_id].append(
         {
@@ -491,21 +519,20 @@ async def websocket_chat(websocket: WebSocket):
             token = data.get("token")
             user = get_authenticated_user(token)
 
-            if token and user is None:
-                await websocket.send_json({"error": "Please log in again."})
+            if user is None:
+                await websocket.send_json({"error": "Please log in to chat with your documents."})
                 continue
 
-            if user is not None:
-                if not user_owns_session(int(user["id"]), session_id):
-                    await websocket.send_json({"error": "You do not have access to this chat session."})
-                    continue
-                load_memory_from_database(ws_memory, session_id)
+            if not user_owns_session(int(user["id"]), session_id):
+                await websocket.send_json({"error": "You do not have access to this chat session."})
+                continue
+            load_memory_from_database(ws_memory, session_id)
 
             if session_id not in ws_memory:
                 ws_memory[session_id] = deque(maxlen=4)
 
             history = list(ws_memory[session_id])
-            answer = search(question, history)
+            answer = search(question, history, int(user["id"]))
 
             ws_memory[session_id].append(
                 {
