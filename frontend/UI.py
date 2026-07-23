@@ -540,8 +540,8 @@ def render_login() -> None:
                 set_logged_in(response.json())
                 set_notice("success", "Welcome back.")
                 st.rerun()
-            except RequestException:
-                set_notice("error", "Login failed because the backend could not be reached.")
+            except Exception as e:
+                st.exception(e)
                 st.rerun()
             except (ValueError, KeyError):
                 set_notice("error", "Login returned an unexpected response.")
