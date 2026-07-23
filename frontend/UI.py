@@ -14,7 +14,7 @@ from websocket import WebSocketException, WebSocketTimeoutException
 # Backend configuration
 # ==========================================================
 
-DEFAULT_API_URL = "https://scaller-bot.onrender.com"
+DEFAULT_API_URL = "http://127.0.0.1:8000"
 API_URL = os.getenv("SCALLER_API_URL", DEFAULT_API_URL).rstrip("/")
 DEFAULT_WS_URL = (
     API_URL.replace("https://", "wss://").replace("http://", "ws://") + "/ws"
@@ -51,6 +51,7 @@ DEFAULT_STATE = {
     "chat_sessions": [],
     "documents": [],
     "last_uploaded_key": "",
+    "uploader_key": 0,
 }
 
 for key, value in DEFAULT_STATE.items():
@@ -408,7 +409,6 @@ st.markdown(
     }
 
     .block-container {
-        max-width: 980px;
         padding: 1.5rem 1rem 2rem;
     }
 
@@ -484,6 +484,20 @@ st.markdown(
             padding-left: 0.75rem;
             padding-right: 0.75rem;
         }
+    }
+
+    .document-card{
+    background:#ffffff;
+    border:1px solid #dbeafe;
+    border-radius:12px;
+    padding:8px 12px;
+    margin-bottom:6px;
+        }
+
+    .document-name{
+    font-size:15px;
+    font-weight:600;
+    color:#1f2937;
     }
     </style>
     """,
@@ -605,6 +619,7 @@ def render_sidebar() -> None:
     with st.sidebar:
         st.title("Scaller AI")
         st.success("Online")
+
         st.divider()
         st.subheader(user.get("full_name", "User"))
         st.caption(user.get("email", ""))
@@ -614,6 +629,7 @@ def render_sidebar() -> None:
             st.rerun()
 
         st.divider()
+
         if st.button("New Chat", use_container_width=True, type="primary"):
             start_new_chat()
             st.rerun()
@@ -623,16 +639,23 @@ def render_sidebar() -> None:
             st.rerun()
 
         st.divider()
+
         st.subheader("Current Session")
         st.caption(st.session_state.session_id[:8])
 
         st.subheader("Chat History")
+
         if not st.session_state.chat_sessions:
             st.caption("No previous chats yet.")
         else:
             for session in st.session_state.chat_sessions:
                 session_id = session["session_id"]
-                button_type = "primary" if session_id == st.session_state.session_id else "secondary"
+                button_type = (
+                    "primary"
+                    if session_id == st.session_state.session_id
+                    else "secondary"
+                )
+
                 if st.button(
                     session_label(session),
                     key=f"session_{session_id}",
@@ -641,43 +664,6 @@ def render_sidebar() -> None:
                 ):
                     load_messages(session_id)
                     st.rerun()
-
-        st.divider()
-        st.subheader("📁 My Documents")
-
-        uploaded_file = st.file_uploader(
-            "Upload a document",
-            type=["pdf", "docx", "txt"],
-            key="document_uploader",
-            label_visibility="collapsed",
-            help="PDF, DOCX, or TXT files only.",
-        )
-
-        if uploaded_file is not None:
-            upload_key = f"{uploaded_file.name}:{uploaded_file.size}"
-            if st.session_state.last_uploaded_key != upload_key:
-                st.session_state.last_uploaded_key = upload_key
-                upload_document(uploaded_file)
-                st.rerun()
-
-        if not st.session_state.documents:
-            st.caption("No documents uploaded yet.")
-        else:
-            for document in st.session_state.documents:
-                doc_id = document["document_id"]
-                with st.container(border=True):
-                    st.markdown(f"**{document['original_filename']}**")
-                    st.caption(
-                        f"{document['file_type'].upper()} • "
-                        f"{document['uploaded_at'][:10]}"
-                    )
-                    if st.button(
-                        "🗑️ Delete",
-                        key=f"delete_doc_{doc_id}",
-                        use_container_width=True,
-                    ):
-                        delete_document(doc_id)
-                        st.rerun()
 
 
 def render_chat() -> None:
@@ -702,6 +688,70 @@ def render_chat() -> None:
         avatar = "👤" if message["role"] == "user" else "🤖"
         with st.chat_message(message["role"], avatar=avatar):
             st.markdown(message["content"])
+
+    # =====================================================
+    # Uploaded Documents
+    # =====================================================
+
+    col1, col2 = st.columns([5, 1])
+
+    with col1:
+        st.markdown("### 📎 Knowledge Base")
+
+    with col2:
+        st.caption(f"{len(st.session_state.documents)} file(s)")
+
+    uploaded_file = st.file_uploader(
+    "📤 Upload Document",
+    type=["pdf", "docx", "txt"],
+    key=f"document_uploader_{st.session_state.uploader_key}",
+)
+
+    if uploaded_file is not None:
+        upload_key = f"{uploaded_file.name}:{uploaded_file.size}"
+
+        if st.session_state.last_uploaded_key != upload_key:
+            st.session_state.last_uploaded_key = upload_key
+
+            upload_document(uploaded_file)
+
+            st.session_state.uploader_key += 1
+            st.session_state.last_uploaded_key = ""
+
+            st.rerun()
+
+    if not st.session_state.documents:
+        st.info("No documents uploaded. Add a PDF, DOCX or TXT to build your knowledge base.")
+    else:
+        for document in st.session_state.documents:
+            doc_id = document["document_id"]
+
+            left, right = st.columns([20,1], vertical_alignment="center")
+
+            with left:
+                st.markdown(
+                    f"""
+                    <div class="document-card">
+                        <div class="document-name">
+                            📄 {document["original_filename"]}
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+            with right:
+                if st.button(
+                    "🗑️",
+                    key=f"delete_doc_{doc_id}",
+                    help="Delete document",
+                ):
+                    delete_document(doc_id)
+                    st.rerun()
+
+    # =====================================================
+    # Ask Question
+    # =====================================================
 
     with st.container(border=True):
         st.subheader("💬 Ask your question")
