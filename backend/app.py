@@ -6,6 +6,7 @@ import json
 import os
 import secrets
 import tempfile
+import threading
 import time
 from typing import Optional
 
@@ -43,9 +44,9 @@ from database import (
     validate_email,
 )
 from document_loader import chunk_text, extract_text
-from embedding import embed_texts
+from embedding import embed_texts, get_model
 from rag import search
-from vector_store import add_document_chunks, delete_document_chunks
+from vector_store import add_document_chunks, delete_document_chunks, get_collection
 
 load_dotenv()
 
@@ -68,6 +69,26 @@ UPLOAD_CHUNK_SIZE = 1024 * 1024
 ALLOWED_DOCUMENT_EXTENSIONS = {".pdf", ".docx", ".txt"}
 
 os.makedirs(UPLOAD_BASE_DIR, exist_ok=True)
+
+
+def _warm_up_rag_dependencies() -> None:
+    """Pre-load the embedding model and Chroma client in the background.
+
+    Runs on a separate thread so it never blocks FastAPI startup or
+    Render's port-binding health check. If it fails for any reason, the
+    first real request will simply load things lazily instead -- this is
+    purely a "get a head start" optimization, not a hard dependency.
+    """
+    try:
+        get_model()
+        get_collection()
+    except Exception:
+        pass  # first real request will retry the lazy load anyway
+
+
+@app.on_event("startup")
+def start_warm_up() -> None:
+    threading.Thread(target=_warm_up_rag_dependencies, daemon=True).start()
 
 
 class Chat(BaseModel):
