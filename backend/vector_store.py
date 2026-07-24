@@ -5,26 +5,45 @@ Thin wrapper around a persistent ChromaDB collection used to store and
 retrieve document chunk embeddings.
 
 The collection is created once with get_or_create_collection() and is
-never dropped or recreated on startup, so uploaded documents survive
+never dropped or recreated on restart, so uploaded documents survive
 server restarts.
 
 Every stored chunk carries this metadata so retrieval can always be
 filtered to the requesting user's own documents:
     user_id, document_id, original_filename, chunk_id
+
+MEMORY OPTIMIZATION:
+`chromadb` transitively imports onnxruntime, opentelemetry, and other
+sizeable packages. Creating the PersistentClient at module import time
+(the old behavior) meant every process paid that RAM cost at startup,
+even for requests that never touch documents. The client/collection are
+now created lazily on first use and cached, so startup stays light and
+the client is still only created once per process.
 """
 
 import os
-from typing import Dict, List, Optional
-
-import chromadb
+from typing import Any, Dict, List, Optional
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CHROMA_PATH = os.getenv("CHROMA_DB_PATH", os.path.join(BASE_DIR, "chroma_db"))
 COLLECTION_NAME = "user_documents"
 
-# A single persistent client/collection reused for the lifetime of the process.
-_client = chromadb.PersistentClient(path=CHROMA_PATH)
-_collection = _client.get_or_create_collection(name=COLLECTION_NAME)
+_collection: Any = None  # lazy-loaded singleton, populated on first real use
+
+
+def get_collection() -> Any:
+    """Create (or reuse) the single persistent Chroma collection for this process."""
+    global _collection
+    if _collection is None:
+        import chromadb
+        from chromadb.config import Settings
+
+        client = chromadb.PersistentClient(
+            path=CHROMA_PATH,
+            settings=Settings(anonymized_telemetry=False),
+        )
+        _collection = client.get_or_create_collection(name=COLLECTION_NAME)
+    return _collection
 
 
 def add_document_chunks(
@@ -49,7 +68,7 @@ def add_document_chunks(
         for index in range(len(chunks))
     ]
 
-    _collection.add(
+    get_collection().add(
         ids=ids,
         embeddings=embeddings,
         documents=chunks,
@@ -66,7 +85,7 @@ def query_user_chunks(
 
     Returns a list of {"text": ..., "filename": ...} dicts, best match first.
     """
-    results = _collection.query(
+    results = get_collection().query(
         query_embeddings=[query_embedding],
         n_results=top_k,
         where={"user_id": str(user_id)},
@@ -88,10 +107,10 @@ def query_user_chunks(
 
 def user_has_documents(user_id: int) -> bool:
     """Cheap check used to give a clearer message when a user has nothing uploaded."""
-    existing = _collection.get(where={"user_id": str(user_id)}, limit=1)
+    existing = get_collection().get(where={"user_id": str(user_id)}, limit=1)
     return bool(existing.get("ids"))
 
 
 def delete_document_chunks(document_id: int) -> None:
     """Remove every chunk belonging to a deleted document. No orphan embeddings."""
-    _collection.delete(where={"document_id": str(document_id)})
+    get_collection().delete(where={"document_id": str(document_id)})

@@ -7,12 +7,16 @@ that text into overlapping chunks ready for embedding.
 Kept intentionally small and dependency-light so it is easy to follow:
     extract_text(path, file_type)  -> full document text
     chunk_text(text)               -> list of chunk strings
+
+MEMORY OPTIMIZATION:
+`pypdf` and `python-docx` are only imported inside the functions that use
+them, not at module level. This module is imported by app.py at startup,
+so keeping it import-light means uploading a document is the only time
+these libraries are actually loaded into memory.
 """
 
+import gc
 from typing import List
-
-from pypdf import PdfReader
-from docx import Document as DocxDocument
 
 # Recommended chunk size/overlap from the project requirements.
 CHUNK_SIZE = 500
@@ -44,17 +48,26 @@ def extract_text(file_path: str, file_type: str) -> str:
 
 
 def _extract_pdf_text(file_path: str) -> str:
+    from pypdf import PdfReader
+
     reader = PdfReader(file_path)
-    pages = []
-    for page in reader.pages:
-        page_text = page.extract_text() or ""
-        pages.append(page_text)
-    return "\n".join(pages)
+    # Read and join page by page rather than materializing extra copies
+    # of the same text; each page's text is discarded once joined.
+    full_text = "\n".join(page.extract_text() or "" for page in reader.pages)
+
+    del reader
+    gc.collect()  # PDF parsing can allocate a lot for large/scanned files
+
+    return full_text
 
 
 def _extract_docx_text(file_path: str) -> str:
+    from docx import Document as DocxDocument
+
     document = DocxDocument(file_path)
     paragraphs = [paragraph.text for paragraph in document.paragraphs]
+
+    del document
     return "\n".join(paragraphs)
 
 

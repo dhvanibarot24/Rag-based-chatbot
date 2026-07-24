@@ -1,5 +1,5 @@
-from collections import deque
 import base64
+import gc
 import hashlib
 import hmac
 import json
@@ -68,16 +68,6 @@ UPLOAD_CHUNK_SIZE = 1024 * 1024
 ALLOWED_DOCUMENT_EXTENSIONS = {".pdf", ".docx", ".txt"}
 
 os.makedirs(UPLOAD_BASE_DIR, exist_ok=True)
-
-# -----------------------------------
-# REST API Memory
-# -----------------------------------
-chat_memory = {}
-
-# -----------------------------------
-# WebSocket Memory
-# -----------------------------------
-ws_memory = {}
 
 
 class Chat(BaseModel):
@@ -188,11 +178,6 @@ def validate_signup(data: SignupRequest) -> None:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
     if data.password != data.confirm_password:
         raise HTTPException(status_code=400, detail="Passwords do not match.")
-
-
-def load_memory_from_database(memory_store: dict, session_id: str) -> None:
-    if session_id not in memory_store:
-        memory_store[session_id] = deque(recent_chat_pairs(session_id), maxlen=4)
 
 
 def safe_save_chat_turn(user: Optional[dict], session_id: str, question: str, answer: str) -> None:
@@ -378,6 +363,15 @@ async def upload_document(
             status_code=500,
             detail=f"The document was saved but could not be processed for search: {exc}",
         ) from exc
+    finally:
+        # `contents` (the raw file bytes) and the extracted text/chunks/embeddings
+        # are only needed for this one request; drop them and collect promptly
+        # rather than waiting for the next allocation to trigger a GC cycle.
+        contents = None
+        document_text = None
+        chunks = None
+        chunk_embeddings = None
+        gc.collect()
 
     return {"document": document}
 
@@ -424,20 +418,10 @@ def chat(data: Chat, authorization: Optional[str] = Header(default=None)):
 
     if not user_owns_session(int(user["id"]), data.session_id):
         raise HTTPException(status_code=403, detail="You do not have access to this chat session.")
-    load_memory_from_database(chat_memory, data.session_id)
 
-    if data.session_id not in chat_memory:
-        chat_memory[data.session_id] = deque(maxlen=4)
-
-    history = list(chat_memory[data.session_id])
+    history = recent_chat_pairs(data.session_id)
     answer = search(data.question, history, int(user["id"]))
 
-    chat_memory[data.session_id].append(
-        {
-            "question": data.question,
-            "answer": answer,
-        }
-    )
     safe_save_chat_turn(user, data.session_id, data.question, answer)
 
     return {"answer": answer}
@@ -459,8 +443,6 @@ def clear_session(data: Session, authorization: Optional[str] = Header(default=N
             raise HTTPException(status_code=403, detail="You do not have access to this chat session.")
         delete_messages(data.session_id)
 
-    chat_memory.pop(data.session_id, None)
-    ws_memory.pop(data.session_id, None)
     return {"status": "cleared"}
 
 
@@ -526,20 +508,10 @@ async def websocket_chat(websocket: WebSocket):
             if not user_owns_session(int(user["id"]), session_id):
                 await websocket.send_json({"error": "You do not have access to this chat session."})
                 continue
-            load_memory_from_database(ws_memory, session_id)
 
-            if session_id not in ws_memory:
-                ws_memory[session_id] = deque(maxlen=4)
-
-            history = list(ws_memory[session_id])
+            history = recent_chat_pairs(session_id)
             answer = search(question, history, int(user["id"]))
 
-            ws_memory[session_id].append(
-                {
-                    "question": question,
-                    "answer": answer,
-                }
-            )
             safe_save_chat_turn(user, session_id, question, answer)
 
             await websocket.send_json({"answer": answer})

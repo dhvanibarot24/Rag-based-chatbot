@@ -9,6 +9,15 @@ websocket-client==1.9.0
 bcrypt==4.3.0
 python-multipart==0.0.20
 chromadb==0.5.23
-sentence-transformers==3.3.1
 pypdf==5.1.0
 python-docx==1.1.2
+
+# --- CPU-only torch (required by sentence-transformers) ---
+# Without this, pip installs torch's CUDA build on Linux, which pulls in
+# nvidia-cublas-cu12 / nvidia-cudnn-cu12 / etc: several hundred extra MB
+# on disk and at import time that a CPU-only Render instance never uses.
+# If pip can't find this exact version, check
+# https://download.pytorch.org/whl/torch/ for the closest available "+cpu" tag.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.5.1+cpu
+sentence-transformers==3.3.1

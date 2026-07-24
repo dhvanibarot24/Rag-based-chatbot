@@ -22,27 +22,27 @@ NO_DOCUMENTS_MESSAGE = (
 def build_prompt(question: str, context: str, history_text: str) -> str:
     """Assemble the grounded RAG prompt sent to Groq."""
     return f"""
-    You are Scaller AI.
+You are Scaller AI.
 
-    Answer ONLY using the retrieved document context below.
+Answer ONLY using the retrieved document context below.
 
-    Rules:
-    - If the answer is not present inside the uploaded documents, clearly say:
-    "I couldn't find this information in your uploaded documents."
-    - Do not hallucinate.
-    - Do not invent information.
-    - Use the conversation history only to understand follow-up questions.
-    - Give the direct answer first, without mentioning "context", "chunks", or "database".
+Rules:
+- If the answer is not present inside the uploaded documents, clearly say:
+  "I couldn't find this information in your uploaded documents."
+- Do not hallucinate.
+- Do not invent information.
+- Use the conversation history only to understand follow-up questions.
+- Give the direct answer first, without mentioning "context", "chunks", or "database".
 
-    Conversation History:
-    {history_text}
+Conversation History:
+{history_text}
 
-    Retrieved Document Context:
-    {context}
+Retrieved Document Context:
+{context}
 
-    Current Question:
-    {question}
-    """
+Current Question:
+{question}
+"""
 
 
 def search(question: str, history, user_id: int) -> str:
